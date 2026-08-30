@@ -1,0 +1,39 @@
+# Secrets
+pipeline_config.json
+
+# Data files (too large for git, cached by GitHub Actions)
+data/
+
+# Python
+__pycache__/
+*.pyc
+
+# Temp/debug files
+_*.py
+_*.txt
+*.log
+*.pdf
+*.html
+*.js
+gk_test.log
+debug_gk.py
+check_*.py
+api_match.txt
+press_release_*.txt
+rajasthan_*
+
+# Backup files
+*_BACKUP*.py
+*_BACKUP_BEFORE_DRIVE.py
+
+# Old GAS script
+google_apps_script_pipeline.gs
+
+# Test/backup/debug files
+backfill_aug15.py
+backup_to_drive.ps1
+pib_one_test.py
+utkarsh_state.json
+run_news_engine.ps1
+setup_auto.ps1
+setup_scheduler.ps1
