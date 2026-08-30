@@ -283,27 +283,39 @@ def main():
     sent = 0
     skipped_dedup = 0
     skipped_stale = 0
+    skipped_source_cap = 0
     failed = 0
+    report_items = []
 
     for art in all_articles:
         if max_total and sent >= max_total:
             break
         aid = art.get("id", "")
+        src = art.get("source", "Unknown")
+        title = art.get("title", "")[:80]
+        status = None
+
         # Dedup
         if aid in dedup:
             skipped_dedup += 1
-            continue
+            status = "dedup"
         # Age
-        dt = parse_date(art.get("date", ""))
-        if dt is None:
-            dt = now
-        if dt < cutoff:
-            skipped_stale += 1
-            continue
+        elif status is None:
+            dt = parse_date(art.get("date", ""))
+            if dt is None:
+                dt = now
+            if dt < cutoff:
+                skipped_stale += 1
+                status = "stale"
         # Per-source cap (0 = unlimited)
-        src = art.get("source", "Unknown")
-        per_source[src] = per_source.get(src, 0)
-        if max_per_source and per_source[src] >= max_per_source:
+        if status is None and max_per_source:
+            per_source[src] = per_source.get(src, 0)
+            if per_source[src] >= max_per_source:
+                skipped_source_cap += 1
+                status = "source_cap"
+
+        if status:
+            report_items.append({"id": aid, "source": src, "title": title, "status": status})
             continue
 
         domain, exams = categorize(art.get("title", "") + " " + (art.get("ministry", "")))
@@ -315,32 +327,70 @@ def main():
         }
         key_points = extract_key_points(art.get("description", ""), 3)
 
-        per_source[src] += 1
+        per_source[src] = per_source.get(src, 0) + 1
 
         if config.get("dry_run", True):
-            log("[DRY] WOULD SEND | %s | %s | %s" % (src, domain, art.get("title", "")[:60]), config)
+            log("[DRY] WOULD SEND | %s | %s | %s" % (src, domain, title), config)
             sent += 1
+            report_items.append({"id": aid, "source": src, "title": title, "status": "dry_run"})
             continue
 
         result = telegram_sender.send_text_to_telegram(
             art.get("title", ""), art.get("description", ""), analysis, key_points, config
         )
         if result["success"]:
-            log("SENT | %s | %s | %s" % (src, domain, art.get("title", "")[:60]), config)
+            log("SENT | %s | %s | %s" % (src, domain, title), config)
             dedup[aid] = now.strftime("%Y-%m-%d %H:%M:%S")
-            save_dedup(dedup, config)  # incremental save -> resumable across runs
+            save_dedup(dedup, config)
             sent += 1
+            report_items.append({"id": aid, "source": src, "title": title, "status": "sent"})
         else:
-            log("FAILED | %s | %s" % (art.get("title", "")[:60], result["message"]), config)
+            log("FAILED | %s | %s" % (title, result["message"]), config)
             failed += 1
+            report_items.append({"id": aid, "source": src, "title": title, "status": "failed", "error": result["message"]})
         time.sleep(1)
 
     save_dedup(dedup, config)
+
+    # Per-source summary
+    source_summary = {}
+    for item in report_items:
+        s = item["source"]
+        if s not in source_summary:
+            source_summary[s] = {"total": 0, "sent": 0, "dedup": 0, "stale": 0, "source_cap": 0, "failed": 0}
+        source_summary[s]["total"] += 1
+        source_summary[s][item["status"]] = source_summary[s].get(item["status"], 0) + 1
+
     log("==========================================", config)
     log("RUN COMPLETED", config)
-    log("SENT: %d | SKIPPED_DEDUP: %d | SKIPPED_STALE: %d | FAILED: %d" % (
-        sent, skipped_dedup, skipped_stale, failed), config)
+    log("SENT: %d | SKIPPED_DEDUP: %d | SKIPPED_STALE: %d | SKIPPED_SOURCE_CAP: %d | FAILED: %d" % (
+        sent, skipped_dedup, skipped_stale, skipped_source_cap, failed), config)
+    for s, counts in source_summary.items():
+        log("  %s: total=%d sent=%d dedup=%d stale=%d cap=%d failed=%d" % (
+            s, counts["total"], counts["sent"], counts["dedup"], counts["stale"], counts["source_cap"], counts["failed"]), config)
     log("==========================================", config)
+
+    # Save run report
+    report = {
+        "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "summary": {
+            "total_merged": len(all_articles),
+            "sent": sent,
+            "skipped_dedup": skipped_dedup,
+            "skipped_stale": skipped_stale,
+            "skipped_source_cap": skipped_source_cap,
+            "failed": failed,
+        },
+        "per_source": source_summary,
+        "items": report_items,
+    }
+    report_path = os.path.join(os.path.dirname(config.get("log_path", ".")), "last_run_report.json")
+    try:
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(report, f, ensure_ascii=False, indent=2)
+        log("Report saved: %s" % report_path, config)
+    except Exception as e:
+        log("REPORT SAVE ERROR: %s" % e, config)
 
 
 if __name__ == "__main__":
