@@ -2,11 +2,11 @@ name: Utkarsh Daily CA
 
 on:
   schedule:
-    - cron: '30 18 * * *'      # once daily at 18:30 UTC (adjust tz as needed)
-  workflow_dispatch:           # allows manual "Run workflow" button
+    - cron: '30 18 * * *'
+  workflow_dispatch:
 
 permissions:
-  contents: write              # needed to persist utkarsh_state.json
+  contents: write
 
 jobs:
   run:
@@ -17,40 +17,37 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: Install dependencies
         run: pip install yt-dlp youtube-transcript-api deep-translator requests
 
-      - name: Write pipeline config (from secrets)
+      - name: Write pipeline config
         run: |
-          cat > pipeline_config.json <<EOF
-          {
-            "telegram_bot_token": "${{ secrets.TELEGRAM_BOT_TOKEN }}",
-            "telegram_chat_id": "${{ secrets.TELEGRAM_CHAT_ID }}",
-            "pib_database_path": "pib_database.json",
-            "ca_database_path": "ca_database.json",
-            "dedup_store_path": "sent_articles.json",
-            "log_path": "pipeline.log",
-            "re_scrape": false,
-            "dry_run": false,
-            "max_article_age_hours": 336,
-            "dedup_days": 14,
-            "max_articles_per_source": 0,
-            "max_articles_total": 0,
-            "telegram_retries": 5,
-            "send_delay": 2.0,
-            "description_chars": 400
+          python -c "
+          import json, os
+          config = {
+            'telegram_bot_token': os.environ['TG_TOKEN'],
+            'telegram_chat_id': os.environ['TG_CHAT'],
+            'pib_database_path': 'pib_database.json',
+            'ca_database_path': 'ca_database.json',
+            'dedup_store_path': 'sent_articles.json',
+            'log_path': 'pipeline.log',
+            're_scrape': False,
+            'dry_run': False,
+            'max_article_age_hours': 336,
+            'dedup_days': 14,
+            'max_articles_per_source': 0,
+            'max_articles_total': 0,
+            'telegram_retries': 5,
+            'send_delay': 2.0,
+            'description_chars': 400
           }
-          EOF
+          with open('pipeline_config.json', 'w') as f: json.dump(config, f, indent=2)
+          "
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
 
       - name: Run Utkarsh pipeline
         run: python utkarsh_youtube_ca.py
-
-      - name: Persist per-day lock
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add utkarsh_state.json
-          git commit -m "chore: update utkarsh state" || echo "no changes"
-          git push || echo "push failed"

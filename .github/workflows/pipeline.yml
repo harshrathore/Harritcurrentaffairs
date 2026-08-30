@@ -20,15 +20,15 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
       - name: Install dependencies
-        run: pip install -r activator/requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Create data directories
         run: mkdir -p data/PIB
 
-      - name: Restore state cache
+      - name: Restore state
         uses: actions/cache@v4
         with:
           path: data/PIB
@@ -39,7 +39,7 @@ jobs:
       - name: Restore utkarsh state
         uses: actions/cache@v4
         with:
-          path: activator/utkarsh_state.json
+          path: utkarsh_state.json
           key: utkarsh-state-${{ github.run_number }}
           restore-keys: |
             utkarsh-state-
@@ -65,39 +65,23 @@ jobs:
             'send_delay': 2.0,
             'description_chars': 400
           }
-          # Write to both locations for compatibility
-          for p in ['activator/pipeline_config.json', 'pipeline_config.json']:
-            with open(p, 'w') as f: json.dump(config, f, indent=2)
+          with open('pipeline_config.json', 'w') as f: json.dump(config, f, indent=2)
           "
         env:
           TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
 
       - name: Run PIB scraper
-        run: python activator/pib_scraper.py
+        run: python pib_scraper.py
         continue-on-error: true
 
       - name: Run CA scraper
-        run: python activator/current_affairs_scraper.py
+        run: python current_affairs_scraper.py
         continue-on-error: true
 
       - name: Run pipeline
-        run: python activator/run_pipeline.py
+        run: python run_pipeline.py
 
       - name: Run Utkarsh
-        run: python activator/utkarsh_youtube_ca.py
+        run: python utkarsh_youtube_ca.py
         continue-on-error: true
-
-      - name: Save state cache
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: data/PIB
-          key: pipeline-state-${{ github.run_number }}
-
-      - name: Save utkarsh state
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: activator/utkarsh_state.json
-          key: utkarsh-state-${{ github.run_number }}
