@@ -38,7 +38,7 @@ if __name__ == "__main__":
     print("HARRIT AUTOMATED PIPELINE STARTED")
     # 1. Refresh PIB data from pib.gov.in
     run_step("pib_scraper.py")
-    # 2. Refresh GKToday / Vision IAS / Insights IAS / Drishti IAS
+    # 2. Refresh GKToday / Insights IAS / Drishti IAS / The Hindu / Indian Express / Down to Earth / Rajasthan DIPR
     run_step("current_affairs_scraper.py")
     # 3. Merge, dedup, filter, send to Telegram
     run_step("run_pipeline.py")

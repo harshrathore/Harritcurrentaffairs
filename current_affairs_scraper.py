@@ -12,11 +12,13 @@ from pathlib import Path
 import json
 import time
 import re
+import html
 
 
 # =========================================================
 # CURRENT AFFAIRS SCRAPER
-# GKToday + Insights IAS + Drishti IAS
+# GKToday + Insights IAS + Drishti IAS + The Hindu +
+# Indian Express + Down to Earth + Rajasthan DIPR
 # =========================================================
 
 
@@ -71,6 +73,34 @@ def error_log(msg):
         with open(ERROR_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(line + "\n")
     except:
+        pass
+
+
+# =========================================================
+# SCRAPER ERROR ALERTS (Telegram)
+# =========================================================
+
+def send_alert(msg):
+    """Send scraper failure alert to Telegram."""
+    try:
+        config_path = Path(__file__).resolve().parent / "pipeline_config.json"
+        if not config_path.exists():
+            config_path = Path(__file__).resolve().parent.parent / "pipeline_config.json"
+        if not config_path.exists():
+            return
+        with open(config_path, encoding="utf-8") as f:
+            config = json.load(f)
+        token = config.get("telegram_bot_token", "")
+        chat_id = config.get("telegram_chat_id", "")
+        if not token or not chat_id:
+            return
+        text = f"⚠️ <b>SCRAPER ALERT</b>\n\n{msg}"
+        requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            data={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+            timeout=10,
+        )
+    except Exception:
         pass
 
 
@@ -556,6 +586,309 @@ def scrape_drishtiias():
 
 
 # =========================================================
+# THE HINDU SCRAPER
+# =========================================================
+
+def scrape_thehindu():
+    """Scrape The Hindu daily current affairs news summaries."""
+    log("THEHINDU: Starting scrape...")
+    articles = []
+    seen = set()
+
+    base = "https://www.thehindu.com/news/"
+    urls = [
+        "https://www.thehindu.com/news/national/",
+        "https://www.thehindu.com/news/international/",
+        "https://www.thehindu.com/business/",
+    ]
+
+    for url in urls:
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=30)
+            if resp.status_code != 200:
+                log(f"THEHINDU: {url} status {resp.status_code}")
+                continue
+        except Exception as e:
+            error_log(f"THEHINDU: fetch {url}: {e}")
+            continue
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for a_tag in soup.select("a[href]"):
+            href = a_tag.get("href", "")
+            title = a_tag.get_text(strip=True)
+            if not title or len(title) < 20:
+                continue
+            if not href.startswith("http"):
+                continue
+            if "thehindu.com" not in href:
+                continue
+            if any(skip in href for skip in ["/podcast", "/video", "/epaper", "/web-stories"]):
+                continue
+            # Deduplicate by title
+            norm = re.sub(r"\s+", " ", title.lower()).strip()
+            if norm in seen:
+                continue
+            seen.add(norm)
+
+            article_id = "TH_" + re.sub(r"[^a-z0-9]+", "-", href.split("/")[-2] if href.endswith("/") else href.split("/")[-1])[:50]
+            articles.append({
+                "id": article_id,
+                "source": "The Hindu",
+                "title": title,
+                "url": href,
+                "date": datetime.now().strftime("%Y-%m-%d") + "T00:00:00",
+                "category": "Current Affairs",
+                "content": "",
+                "collected_at": datetime.now().isoformat(),
+            })
+        time.sleep(REQUEST_DELAY)
+
+    log(f"THEHINDU: Scraped {len(articles)} articles")
+    return articles
+
+
+# =========================================================
+# INDIAN EXPRESS SCRAPER
+# =========================================================
+
+def scrape_indianexpress():
+    """Scrape Indian Express explained / current affairs."""
+    log("INDIANEXPRESS: Starting scrape...")
+    articles = []
+    seen = set()
+
+    urls = [
+        "https://indianexpress.com/section/explained/",
+        "https://indianexpress.com/about/current-affairs/",
+    ]
+
+    for url in urls:
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=30)
+            if resp.status_code != 200:
+                log(f"INDIANEXPRESS: {url} status {resp.status_code}")
+                continue
+        except Exception as e:
+            error_log(f"INDIANEXPRESS: fetch {url}: {e}")
+            continue
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for a_tag in soup.select("h2 a[href], h3 a[href]"):
+            href = a_tag.get("href", "")
+            title = a_tag.get_text(strip=True)
+            if not title or len(title) < 15:
+                continue
+            if not href.startswith("http"):
+                continue
+            if "indianexpress.com" not in href:
+                continue
+            norm = re.sub(r"\s+", " ", title.lower()).strip()
+            if norm in seen:
+                continue
+            seen.add(norm)
+
+            slug = href.rstrip("/").split("/")[-1]
+            article_id = "IE_" + re.sub(r"[^a-z0-9]+", "-", slug)[:50]
+            articles.append({
+                "id": article_id,
+                "source": "Indian Express",
+                "title": title,
+                "url": href,
+                "date": datetime.now().strftime("%Y-%m-%d") + "T00:00:00",
+                "category": "Current Affairs",
+                "content": "",
+                "collected_at": datetime.now().isoformat(),
+            })
+        time.sleep(REQUEST_DELAY)
+
+    log(f"INDIANEXPRESS: Scraped {len(articles)} articles")
+    return articles
+
+
+# =========================================================
+# DOWN TO EARTH SCRAPER
+# =========================================================
+
+def scrape_downtoearth():
+    """Scrape Down to Earth magazine via daily sitemaps."""
+    log("DTE: Starting scrape...")
+    articles = []
+    seen = set()
+
+    try:
+        resp = requests.get("https://www.downtoearth.org.in/sitemap.xml", headers=HEADERS, timeout=30)
+        if resp.status_code != 200:
+            log(f"DTE: sitemap status {resp.status_code}")
+            return articles
+    except Exception as e:
+        error_log(f"DTE: sitemap fetch: {e}")
+        return articles
+
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(resp.text)
+    except Exception as e:
+        error_log(f"DTE: sitemap parse: {e}")
+        return articles
+
+    ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    daily_sitemaps = []
+    for sitemap in root.findall("sm:sitemap", ns):
+        loc = sitemap.find("sm:loc", ns)
+        if loc is not None and f"daily-{today_str[:4]}" in loc.text:
+            daily_sitemaps.append(loc.text)
+    daily_sitemaps = daily_sitemaps[:3]
+
+    for sitemap_url in daily_sitemaps:
+        try:
+            resp = requests.get(sitemap_url, headers=HEADERS, timeout=30)
+            if resp.status_code != 200:
+                continue
+            tree = ET.fromstring(resp.text)
+            for url_el in tree.findall("sm:url", ns):
+                loc = url_el.find("sm:loc", ns)
+                if loc is None:
+                    continue
+                article_url = loc.text
+                if article_url in seen:
+                    continue
+                seen.add(article_url)
+                slug = article_url.rstrip("/").split("/")[-1]
+                title = slug.replace("-", " ").title()
+                article_id = "DTE_" + re.sub(r"[^a-z0-9]+", "-", slug)[:50]
+                articles.append({
+                    "id": article_id,
+                    "source": "Down to Earth",
+                    "title": title,
+                    "url": article_url,
+                    "date": datetime.now().strftime("%Y-%m-%d") + "T00:00:00",
+                    "category": "Environment",
+                    "content": "",
+                    "collected_at": datetime.now().isoformat(),
+                })
+        except Exception as e:
+            error_log(f"DTE: sitemap {sitemap_url}: {e}")
+        time.sleep(1)
+
+    log(f"DTE: Scraped {len(articles)} articles")
+    return articles
+
+
+# =========================================================
+# RAJASTHAN DIPR SCRAPER
+# =========================================================
+
+def scrape_rajasthan_dipr():
+    """Scrape Rajasthan DIPR press releases via government API."""
+    log("RAJDIPR: Starting scrape...")
+    articles = []
+    seen = set()
+
+    api_url = (
+        "https://departmentfrontwebapi.rajasthan.gov.in"
+        "/PublicPortal/DepartmentWebsite/"
+        "GetDIPRPressReleaseByFilter"
+    )
+
+    from_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%dT00:00:00")
+    to_date = datetime.now().strftime("%Y-%m-%dT23:59:59")
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/plain, */*",
+        "Origin": "https://rajasthan.gov.in",
+        "Referer": "https://rajasthan.gov.in/",
+        "User-Agent": HEADERS["User-Agent"],
+    }
+
+    payload = {
+        "FromDateTime": from_date,
+        "ToDateTime": to_date,
+        "PressReleaseLevelCode": 30204,
+        "CategoryCode": 36,
+        "DepartmentCode": 0,
+        "PageNumber": 1,
+        "PageSize": 100,
+    }
+
+    for page in range(1, 5):
+        payload["PageNumber"] = page
+        try:
+            resp = requests.post(api_url, json=payload, headers=headers, timeout=30)
+            if resp.status_code != 200:
+                log(f"RAJDIPR: API status {resp.status_code}")
+                break
+            data = resp.json()
+            # Handle nested response: {"Data": {"Data": [...]}} or {"Data": [...]}
+            inner = data.get("Data", data)
+            if isinstance(inner, dict):
+                records = inner.get("Data", inner.get("data", []))
+            elif isinstance(inner, list):
+                records = inner
+            else:
+                records = []
+            if not records:
+                break
+        except Exception as e:
+            error_log(f"RAJDIPR: API error: {e}")
+            break
+
+        for rec in records:
+            try:
+                rid = str(rec.get("Id", ""))
+                if not rid or rid in seen:
+                    continue
+                seen.add(rid)
+
+                title = rec.get("PressReleaseTitle", "") or ""
+                if not title:
+                    title = rec.get("CategoryName", "") or ""
+                title = re.sub(r"<[^>]+>", "", title).strip()
+                title = html.unescape(title).strip()
+                if not title:
+                    title = rec.get("CategoryName", "") or ""
+                    title = html.unescape(title).strip()
+                desc = rec.get("GeneralDescription", "") or rec.get("Description", "") or ""
+                desc = re.sub(r"<[^>]+>", "", desc)
+                desc = html.unescape(desc).strip()
+                date_str = rec.get("PressreleaseDate", "") or rec.get("PressReleaseDate", "")
+
+                if not title:
+                    title = desc[:80] if desc else ""
+
+                if not title or title == "Press Release":
+                    cat = rec.get("SubCategoryName", "") or rec.get("CategoryName", "") or ""
+                    if desc:
+                        first_line = desc.split("\n")[0][:60].strip()
+                        title = f"{cat}: {first_line}" if cat else first_line
+                    elif cat:
+                        title = cat
+
+                if not title:
+                    continue
+
+                article_id = f"DIPR_{rid}"
+                articles.append({
+                    "id": article_id,
+                    "source": "Rajasthan DIPR",
+                    "title": title,
+                    "url": f"https://rajasthan.gov.in/pressrelease/{rid}",
+                    "date": date_str[:10] if date_str else datetime.now().strftime("%Y-%m-%d"),
+                    "category": "Rajasthan",
+                    "content": desc[:2000],
+                    "collected_at": datetime.now().isoformat(),
+                })
+            except Exception as e:
+                error_log(f"RAJDIPR: parse error: {e}")
+
+        time.sleep(1)
+
+    log(f"RAJDIPR: Scraped {len(articles)} articles")
+    return articles
+
+
+# =========================================================
 # BUILD 7-DAY OUTPUT
 # =========================================================
 
@@ -597,22 +930,36 @@ def main():
     initial_count = len(database)
     log(f"Existing database: {initial_count} articles")
     
-    # Scrape all sources
+    # Scrape all sources with error tracking
     new_articles = []
-    
-    # GKToday
-    gktoday_articles = scrape_gktoday()
-    new_articles.extend(gktoday_articles)
-    time.sleep(REQUEST_DELAY)
-    
-    # Insights IAS
-    insightsias_articles = scrape_insightsonindia()
-    new_articles.extend(insightsias_articles)
-    time.sleep(REQUEST_DELAY)
-    
-    # Drishti IAS
-    drishtiias_articles = scrape_drishtiias()
-    new_articles.extend(drishtiias_articles)
+    alerts = []
+
+    scrapers = [
+        ("GKToday", scrape_gktoday),
+        ("Insights IAS", scrape_insightsonindia),
+        ("Drishti IAS", scrape_drishtiias),
+        ("The Hindu", scrape_thehindu),
+        ("Indian Express", scrape_indianexpress),
+        ("Down to Earth", scrape_downtoearth),
+        ("Rajasthan DIPR", scrape_rajasthan_dipr),
+    ]
+
+    for name, fn in scrapers:
+        try:
+            result = fn()
+            if not result and name not in ("Drishti IAS",):
+                alerts.append(f"{name}: 0 articles scraped")
+            new_articles.extend(result)
+        except Exception as e:
+            error_log(f"{name}: CRASHED - {e}")
+            alerts.append(f"{name}: CRASHED - {e}")
+        time.sleep(REQUEST_DELAY)
+
+    # Send Telegram alerts for empty/failed scrapers
+    if alerts:
+        alert_msg = "\n".join(f"• {a}" for a in alerts)
+        log(f"ALERTS: {alert_msg}")
+        send_alert(alert_msg)
     
     # Add new articles to database
     new_saved = 0
@@ -623,7 +970,6 @@ def main():
         article_id = article["id"]
         
         if article_id in database:
-            # Update if existing article has short content
             existing = database[article_id]
             if len(existing.get("content", "")) < 500 and len(article.get("content", "")) > len(existing.get("content", "")):
                 database[article_id] = article
@@ -637,14 +983,11 @@ def main():
         new_saved += 1
         log(f"SAVED: {article['source']} | {article['title'][:60]}")
     
-    # Save database
     if save_database(database):
         log(f"Database saved: {len(database)} total articles")
     
-    # Build 7-day output
     latest = build_latest_output(database)
     
-    # Report
     log("==========================================")
     log("RUN COMPLETED")
     log(f"INITIAL DATABASE: {initial_count}")
@@ -654,6 +997,7 @@ def main():
     log(f"DUPLICATES:       {duplicates}")
     log(f"FINAL DATABASE:   {len(database)}")
     log(f"7-DAY OUTPUT:     {len(latest)}")
+    log(f"ALERTS:           {len(alerts)}")
     log("==========================================")
 
 

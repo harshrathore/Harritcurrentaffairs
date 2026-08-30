@@ -25,6 +25,12 @@ START_URL = (
     "AllRelease.aspx?lang=1&reg=3"
 )
 
+# Hindi PIB
+HINDI_URL = (
+    "https://www.pib.gov.in/"
+    "AllRelease.aspx?lang=2&reg=3"
+)
+
 # Also try the region-specific URL if main fails
 FALLBACK_URL = (
     "https://www.pib.gov.in/"
@@ -1723,6 +1729,44 @@ def main():
         f"ARCHIVE DISCOVERED: "
         f"{len(releases)} releases"
     )
+
+    # =====================================================
+    # FETCH HINDI PIB ARCHIVE
+    # =====================================================
+
+    try:
+
+        hindi_html = fetch_page(
+            HINDI_URL
+        )
+
+        hindi_releases = extract_release_links(
+            hindi_html
+        )
+
+        # Merge: add Hindi releases not already seen
+        seen_prids = {r.get("prid") for r in releases}
+
+        for hr in hindi_releases:
+
+            if hr.get("prid") not in seen_prids:
+
+                releases.append(hr)
+
+                seen_prids.add(
+                    hr.get("prid")
+                )
+
+        log(
+            f"AFTER HINDI MERGE: "
+            f"{len(releases)} total releases"
+        )
+
+    except Exception as e:
+
+        error_log(
+            f"HINDI ARCHIVE ERROR: {e}"
+        )
 
     # =====================================================
     # FILTER TO 7-DAY WINDOW
