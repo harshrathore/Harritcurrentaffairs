@@ -17,8 +17,8 @@ import html
 
 # =========================================================
 # CURRENT AFFAIRS SCRAPER
-# GKToday + Insights IAS + Drishti IAS + The Hindu +
-# Indian Express + Down to Earth + Rajasthan DIPR
+# GKToday + Insights IAS + Drishti IAS +
+# Down to Earth + Rajasthan DIPR
 # =========================================================
 
 
@@ -586,126 +586,6 @@ def scrape_drishtiias():
 
 
 # =========================================================
-# THE HINDU SCRAPER
-# =========================================================
-
-def scrape_thehindu():
-    """Scrape The Hindu daily current affairs news summaries."""
-    log("THEHINDU: Starting scrape...")
-    articles = []
-    seen = set()
-
-    base = "https://www.thehindu.com/news/"
-    urls = [
-        "https://www.thehindu.com/news/national/",
-        "https://www.thehindu.com/news/international/",
-        "https://www.thehindu.com/business/",
-    ]
-
-    for url in urls:
-        try:
-            resp = requests.get(url, headers=HEADERS, timeout=30)
-            if resp.status_code != 200:
-                log(f"THEHINDU: {url} status {resp.status_code}")
-                continue
-        except Exception as e:
-            error_log(f"THEHINDU: fetch {url}: {e}")
-            continue
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        for a_tag in soup.select("a[href]"):
-            href = a_tag.get("href", "")
-            title = a_tag.get_text(strip=True)
-            if not title or len(title) < 20:
-                continue
-            if not href.startswith("http"):
-                continue
-            if "thehindu.com" not in href:
-                continue
-            if any(skip in href for skip in ["/podcast", "/video", "/epaper", "/web-stories"]):
-                continue
-            # Deduplicate by title
-            norm = re.sub(r"\s+", " ", title.lower()).strip()
-            if norm in seen:
-                continue
-            seen.add(norm)
-
-            article_id = "TH_" + re.sub(r"[^a-z0-9]+", "-", href.split("/")[-2] if href.endswith("/") else href.split("/")[-1])[:50]
-            articles.append({
-                "id": article_id,
-                "source": "The Hindu",
-                "title": title,
-                "url": href,
-                "date": datetime.now().strftime("%Y-%m-%d") + "T00:00:00",
-                "category": "Current Affairs",
-                "content": "",
-                "collected_at": datetime.now().isoformat(),
-            })
-        time.sleep(REQUEST_DELAY)
-
-    log(f"THEHINDU: Scraped {len(articles)} articles")
-    return articles
-
-
-# =========================================================
-# INDIAN EXPRESS SCRAPER
-# =========================================================
-
-def scrape_indianexpress():
-    """Scrape Indian Express explained / current affairs."""
-    log("INDIANEXPRESS: Starting scrape...")
-    articles = []
-    seen = set()
-
-    urls = [
-        "https://indianexpress.com/section/explained/",
-        "https://indianexpress.com/about/current-affairs/",
-    ]
-
-    for url in urls:
-        try:
-            resp = requests.get(url, headers=HEADERS, timeout=30)
-            if resp.status_code != 200:
-                log(f"INDIANEXPRESS: {url} status {resp.status_code}")
-                continue
-        except Exception as e:
-            error_log(f"INDIANEXPRESS: fetch {url}: {e}")
-            continue
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        for a_tag in soup.select("h2 a[href], h3 a[href]"):
-            href = a_tag.get("href", "")
-            title = a_tag.get_text(strip=True)
-            if not title or len(title) < 15:
-                continue
-            if not href.startswith("http"):
-                continue
-            if "indianexpress.com" not in href:
-                continue
-            norm = re.sub(r"\s+", " ", title.lower()).strip()
-            if norm in seen:
-                continue
-            seen.add(norm)
-
-            slug = href.rstrip("/").split("/")[-1]
-            article_id = "IE_" + re.sub(r"[^a-z0-9]+", "-", slug)[:50]
-            articles.append({
-                "id": article_id,
-                "source": "Indian Express",
-                "title": title,
-                "url": href,
-                "date": datetime.now().strftime("%Y-%m-%d") + "T00:00:00",
-                "category": "Current Affairs",
-                "content": "",
-                "collected_at": datetime.now().isoformat(),
-            })
-        time.sleep(REQUEST_DELAY)
-
-    log(f"INDIANEXPRESS: Scraped {len(articles)} articles")
-    return articles
-
-
-# =========================================================
 # DOWN TO EARTH SCRAPER
 # =========================================================
 
@@ -938,8 +818,6 @@ def main():
         ("GKToday", scrape_gktoday),
         ("Insights IAS", scrape_insightsonindia),
         ("Drishti IAS", scrape_drishtiias),
-        ("The Hindu", scrape_thehindu),
-        ("Indian Express", scrape_indianexpress),
         ("Down to Earth", scrape_downtoearth),
         ("Rajasthan DIPR", scrape_rajasthan_dipr),
     ]
