@@ -51,9 +51,13 @@ def find_utkarsh_ca_video(d):
 # ---------- 2. TRANSCRIPT (Hindi) ----------
 def get_hindi(vid):
     api = YouTubeTranscriptApi()
-    fetched = api.fetch(vid, languages=["hi"])
-    segs = fetched.snippets if hasattr(fetched, "snippets") else fetched
-    return " ".join(s.text for s in segs)
+    try:
+        fetched = api.fetch(vid, languages=["hi"])
+        segs = fetched.snippets if hasattr(fetched, "snippets") else fetched
+        return " ".join(s.text for s in segs)
+    except Exception as e:
+        print(f"[utkarsh] No transcript for {vid}: {e}")
+        return ""
 
 
 # ---------- 3. TRANSLATE (resume-able) ----------
@@ -229,6 +233,9 @@ def main():
     cache_path = f"utkarsh_cache_{datekey}.txt"
     hindi = get_hindi(vid)
     print(f"[utkarsh] Hindi transcript chars: {len(hindi)}")
+    if len(hindi) < 10:
+        print(f"[utkarsh] Skipping - no transcript available")
+        return
     en = translate(hindi, cache_path)
     print(f"[utkarsh] English chars: {len(en)}")
     items = parse_ca(en)
