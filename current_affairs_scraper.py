@@ -134,109 +134,115 @@ def save_database(database):
 # =========================================================
 
 def scrape_gktoday():
-    """Scrape GKToday current affairs articles (paginated across listing pages)."""
+    """Scrape GKToday current affairs articles (paginated across listing pages + categories)."""
     log("GKTODAY: Starting scrape...")
     articles = []
 
-    base = "https://www.gktoday.in/current-affairs"
+    # Main page + category pages for complete coverage
+    base_urls = [
+        "https://www.gktoday.in/current-affairs",
+        "https://www.gktoday.in/current-affairs/category/government-schemes",
+        "https://www.gktoday.in/current-affairs/category/science-technology-current-affairs",
+        "https://www.gktoday.in/current-affairs/category/sports-current-affairs",
+        "https://www.gktoday.in/current-affairs/category/reports-indexes",
+    ]
     max_pages = 10
-    for pg in range(1, max_pages + 1):
-        url = base if pg == 1 else f"{base}/page/{pg}/"
-        try:
-            resp = requests.get(url, headers=HEADERS, timeout=30)
-            resp.raise_for_status()
-        except Exception as e:
-            error_log(f"GKTODAY: Failed to fetch page {pg}: {e}")
-            break
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        # Find all article items on this page
-        items = soup.select(".home-post-item")
-        log(f"GKTODAY: Found {len(items)} articles on page {pg}")
-        if not items:
-            break
-
-        for item in items:
+    for base in base_urls:
+        for pg in range(1, max_pages + 1):
+            url = base if pg == 1 else f"{base}/page/{pg}/"
             try:
-                # Extract title and link
-                title_tag = item.select_one("h3 a")
-                if not title_tag:
-                    continue
-
-                title = title_tag.get_text(strip=True)
-                link = title_tag.get("href", "")
-                if not title or not link:
-                    continue
-
-                # Extract date
-                date_tag = item.select_one(".home-post-data-meta")
-                date_str = ""
-                if date_tag:
-                    date_text = date_tag.get_text(strip=True)
-                    date_match = re.search(r"(\w+ \d+, \d{4})", date_text)
-                    if date_match:
-                        date_str = date_match.group(1)
-
-                category = ""
-                cat_tag = item.select_one(".home-post-data-meta a")
-                if cat_tag:
-                    category = cat_tag.get_text(strip=True)
-
-                # Extract description from listing page (short snippet)
-                desc = ""
-                desc_tag = item.select_one(".post-data")
-                if desc_tag:
-                    desc = desc_tag.get_text(strip=True)
-                    desc = desc.replace(title, "").strip()
-                    desc = desc[:500]
-
-                # Parse date
-                pub_date = None
-                if date_str:
-                    try:
-                        pub_date = datetime.strptime(date_str, "%B %d, %Y")
-                    except Exception:
-                        pass
-                if not pub_date:
-                    pub_date = datetime.now()
-
-                # Fetch full article content from individual page
-                full_content = desc
-                try:
-                    time.sleep(1)  # Be polite - 1 second delay
-                    article_resp = requests.get(link, headers=HEADERS, timeout=30)
-                    if article_resp.status_code == 200:
-                        article_soup = BeautifulSoup(article_resp.text, "html.parser")
-                        content_div = article_soup.select_one(".content-area")
-                        if content_div:
-                            for tag in content_div.select(
-                                "script, style, .related-articles, .social-share, "
-                                ".adsbygoogle, .breadcrumb, .post-meta, "
-                                ".gktoday-share-box, .a2a_kit"
-                            ):
-                                tag.decompose()
-                            full_content = content_div.get_text(separator=" ", strip=True)
-                            full_content = full_content[:2000]  # Limit to 2000 chars
-                except Exception as e:
-                    error_log(f"GKTODAY: Failed to fetch article content: {e}")
-
-                # Generate article ID
-                article_id = f"GKT_{link.split('/')[-2] if link.endswith('/') else link.split('/')[-1]}"
-
-                articles.append({
-                    "id": article_id,
-                    "source": "GKToday",
-                    "title": title,
-                    "url": link,
-                    "date": pub_date.isoformat(),
-                    "category": category,
-                    "content": full_content if full_content else desc,
-                    "collected_at": datetime.now().isoformat()
-                })
+                resp = requests.get(url, headers=HEADERS, timeout=30)
+                resp.raise_for_status()
             except Exception as e:
-                error_log(f"GKTODAY: Error parsing article: {e}")
-                continue
-        time.sleep(REQUEST_DELAY)
+                break
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            # Find all article items on this page
+            items = soup.select(".home-post-item")
+            if not items:
+                break
+
+            for item in items:
+                try:
+                    # Extract title and link
+                    title_tag = item.select_one("h3 a")
+                    if not title_tag:
+                        continue
+
+                    title = title_tag.get_text(strip=True)
+                    link = title_tag.get("href", "")
+                    if not title or not link:
+                        continue
+
+                    # Extract date
+                    date_tag = item.select_one(".home-post-data-meta")
+                    date_str = ""
+                    if date_tag:
+                        date_text = date_tag.get_text(strip=True)
+                        date_match = re.search(r"(\w+ \d+, \d{4})", date_text)
+                        if date_match:
+                            date_str = date_match.group(1)
+
+                    category = ""
+                    cat_tag = item.select_one(".home-post-data-meta a")
+                    if cat_tag:
+                        category = cat_tag.get_text(strip=True)
+
+                    # Extract description from listing page (short snippet)
+                    desc = ""
+                    desc_tag = item.select_one(".post-data")
+                    if desc_tag:
+                        desc = desc_tag.get_text(strip=True)
+                        desc = desc.replace(title, "").strip()
+                        desc = desc[:500]
+
+                    # Parse date
+                    pub_date = None
+                    if date_str:
+                        try:
+                            pub_date = datetime.strptime(date_str, "%B %d, %Y")
+                        except Exception:
+                            pass
+                    if not pub_date:
+                        pub_date = datetime.now()
+
+                    # Fetch full article content from individual page
+                    full_content = desc
+                    try:
+                        time.sleep(1)  # Be polite - 1 second delay
+                        article_resp = requests.get(link, headers=HEADERS, timeout=30)
+                        if article_resp.status_code == 200:
+                            article_soup = BeautifulSoup(article_resp.text, "html.parser")
+                            content_div = article_soup.select_one(".content-area")
+                            if content_div:
+                                for tag in content_div.select(
+                                    "script, style, .related-articles, .social-share, "
+                                    ".adsbygoogle, .breadcrumb, .post-meta, "
+                                    ".gktoday-share-box, .a2a_kit"
+                                ):
+                                    tag.decompose()
+                                full_content = content_div.get_text(separator=" ", strip=True)
+                                full_content = full_content[:2000]  # Limit to 2000 chars
+                    except Exception as e:
+                        error_log(f"GKTODAY: Failed to fetch article content: {e}")
+
+                    # Generate article ID
+                    article_id = f"GKT_{link.split('/')[-2] if link.endswith('/') else link.split('/')[-1]}"
+
+                    articles.append({
+                        "id": article_id,
+                        "source": "GKToday",
+                        "title": title,
+                        "url": link,
+                        "date": pub_date.isoformat(),
+                        "category": category,
+                        "content": full_content if full_content else desc,
+                        "collected_at": datetime.now().isoformat()
+                    })
+                except Exception as e:
+                    error_log(f"GKTODAY: Error parsing article: {e}")
+                    continue
+            time.sleep(REQUEST_DELAY)
 
     log(f"GKTODAY: Scraped {len(articles)} articles")
     return articles
