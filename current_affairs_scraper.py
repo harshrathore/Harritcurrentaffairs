@@ -662,6 +662,121 @@ def scrape_downtoearth():
 
 
 # =========================================================
+# PMF IAS SCRAPER
+# =========================================================
+
+def scrape_pmfias():
+    """Scrape PMF IAS daily current affairs articles via cloudscraper."""
+    log("PMFIAS: Starting scrape...")
+    articles = []
+
+    try:
+        import cloudscraper
+    except ImportError:
+        error_log("PMFIAS: cloudscraper not installed")
+        return articles
+
+    scraper = cloudscraper.create_scraper()
+    seen_urls = set()
+
+    pg = 1
+    while True:
+        url = "https://www.pmfias.com/category/current-affairs" if pg == 1 else f"https://www.pmfias.com/category/current-affairs/page/{pg}/"
+        try:
+            resp = scraper.get(url, timeout=30)
+            if resp.status_code != 200:
+                break
+        except Exception as e:
+            error_log(f"PMFIAS: Failed to fetch page {pg}: {e}")
+            break
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        # Find article links matching daily current affairs pattern
+        page_urls = []
+        for a in soup.select("a[href]"):
+            href = a.get("href", "")
+            text = a.get_text(strip=True)
+            if re.search(r"current-affairs-\w+-\d+-\d{4}", href) and href not in seen_urls:
+                if "pmfias.com" in href and len(text) > 10:
+                    page_urls.append((href, text))
+                    seen_urls.add(href)
+
+        if not page_urls:
+            break
+
+        log(f"PMFIAS: Page {pg} - {len(page_urls)} articles")
+
+        for article_url, title in page_urls:
+            try:
+                time.sleep(1)
+                resp2 = scraper.get(article_url, timeout=30)
+                if resp2.status_code != 200:
+                    continue
+
+                soup2 = BeautifulSoup(resp2.text, "html.parser")
+
+                # Find the main article with category-current-affairs-2026
+                best_content = None
+                for art in soup2.select("article"):
+                    cls = " ".join(art.get("class", []))
+                    if "current-affairs" in cls:
+                        content_div = art.select_one(".entry-content")
+                        if content_div and len(content_div.get_text(strip=True)) > 200:
+                            best_content = content_div
+                            break
+
+                if not best_content:
+                    continue
+
+                for tag in best_content.select("script, style, .related-posts, .sharedaddy, .jp-relatedposts, figure, aside"):
+                    tag.decompose()
+
+                full_content = best_content.get_text(separator=" ", strip=True)
+
+                # Extract date from URL
+                date_match = re.search(r"current-affairs-(\w+)-(\d+)-(\d{4})", article_url)
+                pub_date = None
+                if date_match:
+                    month_name = date_match.group(1)
+                    day = date_match.group(2)
+                    year = date_match.group(3)
+                    try:
+                        pub_date = datetime.strptime(f"{month_name} {day} {year}", "%B %d %Y")
+                    except Exception:
+                        try:
+                            pub_date = datetime.strptime(f"{month_name} {day} {year}", "%b %d %Y")
+                        except Exception:
+                            pass
+
+                if not pub_date:
+                    pub_date = datetime.now()
+
+                article_id = f"PMF_{article_url.rstrip('/').split('/')[-1]}"
+
+                articles.append({
+                    "id": article_id,
+                    "source": "PMF IAS",
+                    "title": title.replace("Current Affairs", "").replace("–", "").strip(" -"),
+                    "url": article_url,
+                    "date": pub_date.isoformat(),
+                    "category": "Current Affairs",
+                    "content": full_content,
+                    "collected_at": datetime.now().isoformat()
+                })
+
+            except Exception as e:
+                error_log(f"PMFIAS: Error fetching article: {e}")
+                continue
+
+        pg += 1
+        time.sleep(REQUEST_DELAY)
+
+    log(f"PMFIAS: Scraped {len(articles)} articles")
+    return articles
+
+
+# =========================================================
 # RAJASTHAN DIPR SCRAPER
 # =========================================================
 
@@ -825,6 +940,7 @@ def main():
         ("Insights IAS", scrape_insightsonindia),
         ("Drishti IAS", scrape_drishtiias),
         ("Down to Earth", scrape_downtoearth),
+        ("PMF IAS", scrape_pmfias),
         ("Rajasthan DIPR", scrape_rajasthan_dipr),
     ]
 

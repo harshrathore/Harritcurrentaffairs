@@ -1,5 +1,6 @@
 requests
 beautifulsoup4
+cloudscraper
 yt-dlp
 youtube-transcript-api
 deep-translator
