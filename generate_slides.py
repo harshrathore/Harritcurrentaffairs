@@ -9,6 +9,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE, "..", "data", "PIB")
 CA_DB = os.path.join(DATA_DIR, "current_affairs_database.json")
 PPTX_DIR = os.path.join(DATA_DIR, "slides")
+MASTER_FILE = os.path.join(PPTX_DIR, "current_affairs_all.pptx")
 
 DARK_GREEN = RGBColor(0x58, 0x6E, 0x5A)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
@@ -64,7 +65,7 @@ def add_bg(slide):
     f.fore_color.rgb = DARK_GREEN
 
 
-def create_date_title_slide(prs, date_str, total, categories=None):
+def create_date_title_slide(prs, date_str, total, page_num=None, categories=None):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     add_bg(slide)
 
@@ -76,12 +77,16 @@ def create_date_title_slide(prs, date_str, total, categories=None):
                 f"Total Articles: {total} | Source: GKToday",
                 font_size=20, color=LIGHT_GREEN, alignment=PP_ALIGN.CENTER)
 
+    if page_num:
+        add_textbox(slide, 1, 4.5, 11.3, 0.5, f"Page {page_num}",
+                    font_size=16, color=LIGHT_GREEN, alignment=PP_ALIGN.CENTER)
+
     if categories:
         cat_lines = []
         for cat, count in categories.items():
             cat_lines.append(f"{cat}: {count}")
         cat_text = " | ".join(cat_lines)
-        add_textbox(slide, 0.5, 4.8, 12.3, 1, cat_text,
+        add_textbox(slide, 0.5, 5.2, 12.3, 1, cat_text,
                     font_size=14, color=LIGHT_GREEN, alignment=PP_ALIGN.CENTER)
 
     add_textbox(slide, 1, 6.5, 11.3, 0.6, "Harrit Current Affairs",
@@ -121,56 +126,136 @@ def create_article_slide(prs, article):
                 font_size=18, color=WHITE)
 
 
-def generate_presentation(dates=None, output_name=None):
+def get_existing_dates_in_file(filepath):
+    """Check which dates already exist in the master file."""
+    if not os.path.exists(filepath):
+        return set()
+    try:
+        prs = Presentation(filepath)
+        dates = set()
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    for para in shape.text_frame.paragraphs:
+                        text = para.text.strip()
+                        if len(text) == 10 and text.count("-") == 2:
+                            try:
+                                datetime.strptime(text, "%Y-%m-%d")
+                                dates.add(text)
+                            except ValueError:
+                                pass
+        return dates
+    except Exception:
+        return set()
+
+
+def get_current_page_count(filepath):
+    """Get current number of slides in master file."""
+    if not os.path.exists(filepath):
+        return 0
+    try:
+        prs = Presentation(filepath)
+        return len(prs.slides)
+    except Exception:
+        return 0
+
+
+def add_date_to_master(date_str=None):
+    """Add a single date's articles to the master file."""
+    database = load_ca_database()
+
+    if not date_str:
+        date_str = datetime.now().strftime("%Y-%m-%d")
+
+    os.makedirs(PPTX_DIR, exist_ok=True)
+
+    existing_dates = get_existing_dates_in_file(MASTER_FILE)
+    if date_str in existing_dates:
+        print(f"Date {date_str} already in file, skipping")
+        return MASTER_FILE
+
+    articles = [a for a in database.values() if a.get("date", "")[:10] == date_str]
+    if not articles:
+        print(f"No articles for {date_str}")
+        return None
+
+    page_num = get_current_page_count(MASTER_FILE) + 1
+
+    if os.path.exists(MASTER_FILE):
+        prs = Presentation(MASTER_FILE)
+    else:
+        prs = Presentation()
+        prs.slide_width = Inches(13.333)
+        prs.slide_height = Inches(7.5)
+
+    print(f"{date_str}: {len(articles)} articles (starting page {page_num})")
+
+    categories = {}
+    for art in articles:
+        cat = art.get("category", "General")
+        categories[cat] = categories.get(cat, 0) + 1
+
+    create_date_title_slide(prs, date_str, len(articles), page_num, categories)
+
+    for art in articles:
+        create_article_slide(prs, art)
+
+    prs.save(MASTER_FILE)
+    print(f"Saved: {MASTER_FILE} (total slides now: {len(prs.slides)})")
+    return MASTER_FILE
+
+
+def add_dates_to_master(dates):
+    """Add multiple dates to master file."""
+    for d in dates:
+        add_date_to_master(d)
+
+
+def generate_full_presentation(dates=None):
+    """Regenerate entire master file from scratch."""
     database = load_ca_database()
 
     if not dates:
-        dates = [datetime.now().strftime("%Y-%m-%d")]
-
-    if isinstance(dates, str):
-        dates = [dates]
+        dates = sorted(set(a.get("date", "")[:10] for a in database.values() if a.get("date")))
 
     prs = Presentation()
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
 
-    total_articles = 0
+    total = 0
+    page_num = 1
 
     for date_str in dates:
         articles = [a for a in database.values() if a.get("date", "")[:10] == date_str]
         if not articles:
-            print(f"No articles for {date_str}, skipping")
             continue
 
         print(f"{date_str}: {len(articles)} articles")
-        total_articles += len(articles)
+        total += len(articles)
 
         categories = {}
         for art in articles:
             cat = art.get("category", "General")
             categories[cat] = categories.get(cat, 0) + 1
 
-        create_date_title_slide(prs, date_str, len(articles), categories)
+        create_date_title_slide(prs, date_str, len(articles), page_num, categories)
+        page_num += 1
 
         for art in articles:
             create_article_slide(prs, art)
 
-    if total_articles == 0:
-        print("No articles found for any date")
-        return None
-
     os.makedirs(PPTX_DIR, exist_ok=True)
-    if not output_name:
-        output_name = "current_affairs_all.pptx"
-    filepath = os.path.join(PPTX_DIR, output_name)
-    prs.save(filepath)
-    print(f"Saved: {filepath} ({total_articles} articles)")
-    return filepath
+    prs.save(MASTER_FILE)
+    print(f"Saved: {MASTER_FILE} ({total} articles)")
+    return MASTER_FILE
 
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        if sys.argv[1] == "--range":
+        if sys.argv[1] == "--append":
+            date_arg = sys.argv[2] if len(sys.argv) > 2 else None
+            add_date_to_master(date_arg)
+        elif sys.argv[1] == "--range":
             start = datetime.strptime(sys.argv[2], "%Y-%m-%d")
             end = datetime.strptime(sys.argv[3], "%Y-%m-%d")
             dates = []
@@ -178,9 +263,12 @@ if __name__ == "__main__":
             while current <= end:
                 dates.append(current.strftime("%Y-%m-%d"))
                 current += timedelta(days=1)
-            out = sys.argv[4] if len(sys.argv) > 4 else None
-            generate_presentation(dates, out)
+            for d in dates:
+                add_date_to_master(d)
+        elif sys.argv[1] == "--rebuild":
+            generate_full_presentation()
         else:
-            generate_presentation(sys.argv[1:])
+            for d in sys.argv[1:]:
+                add_date_to_master(d)
     else:
-        generate_presentation()
+        add_date_to_master()
