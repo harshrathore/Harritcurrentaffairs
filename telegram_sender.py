@@ -88,7 +88,6 @@ def send_text_to_telegram(headline, description, analysis, key_points, config):
     if analysis.get("link"):
         msg += "\n<b>Read More:</b> " + escape_html(analysis["link"]) + "\n"
 
-    msg += "\n#CurrentAffairs #HarritClasses"
     msg += "\n<i>Source: " + escape_html(source_str) + "</i>"
 
     for attempt in range(max_retries + 1):
