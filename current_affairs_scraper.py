@@ -145,6 +145,11 @@ def scrape_gktoday():
         "https://www.gktoday.in/current-affairs/category/science-technology-current-affairs",
         "https://www.gktoday.in/current-affairs/category/sports-current-affairs",
         "https://www.gktoday.in/current-affairs/category/reports-indexes",
+        "https://www.gktoday.in/current-affairs/category/economy-current-affairs",
+        "https://www.gktoday.in/current-affairs/category/defence-current-affairs",
+        "https://www.gktoday.in/current-affairs/category/international-current-affairs",
+        "https://www.gktoday.in/current-affairs/category/awards-honours-persons-news-current-affairs",
+        "https://www.gktoday.in/current-affairs/category/summits-conferences",
     ]
     max_pages = 10
     for base in base_urls:
