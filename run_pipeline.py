@@ -208,28 +208,6 @@ def extract_key_points(text, n=3):
     return points
 
 
-def load_dedup(config):
-    path = config.get("dedup_store_path", "")
-    if not path or not os.path.exists(path):
-        return {}
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def save_dedup(store, config):
-    path = config.get("dedup_store_path", "")
-    if not path:
-        return
-    try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(store, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print("DEDUP SAVE ERROR:", e)
-
-
 def main():
     config = load_config()
     log("==========================================", config)
@@ -268,8 +246,7 @@ def main():
     all_articles = pib + ca
     log("Total merged: %d articles" % len(all_articles), config)
 
-    # 4. Dedup + age filter
-    dedup = load_dedup(config)
+    # 4. Age filter only (no dedup)
     cutoff = datetime.now() - timedelta(hours=config.get("max_article_age_hours", 336))
     now = datetime.now()
 
@@ -278,7 +255,6 @@ def main():
     max_total = config.get("max_articles_total", 0)
 
     sent = 0
-    skipped_dedup = 0
     skipped_stale = 0
     skipped_source_cap = 0
     failed = 0
@@ -292,18 +268,13 @@ def main():
         title = art.get("title", "")[:80]
         status = None
 
-        # Dedup
-        if aid in dedup:
-            skipped_dedup += 1
-            status = "dedup"
-        # Age
-        elif status is None:
-            dt = parse_date(art.get("date", ""))
-            if dt is None:
-                dt = now
-            if dt < cutoff:
-                skipped_stale += 1
-                status = "stale"
+        # Age filter
+        dt = parse_date(art.get("date", ""))
+        if dt is None:
+            dt = now
+        if dt < cutoff:
+            skipped_stale += 1
+            status = "stale"
         # Per-source cap (0 = unlimited)
         if status is None and max_per_source:
             per_source[src] = per_source.get(src, 0)
@@ -343,8 +314,6 @@ def main():
             result = {"success": False, "message": "No link"}
         if result["success"]:
             log("SENT | %s | %s | %s" % (src, domain, title), config)
-            dedup[aid] = now.strftime("%Y-%m-%d %H:%M:%S")
-            save_dedup(dedup, config)
             sent += 1
             report_items.append({"id": aid, "source": src, "title": title, "status": "sent"})
         else:
@@ -353,21 +322,19 @@ def main():
             report_items.append({"id": aid, "source": src, "title": title, "status": "failed", "error": result["message"]})
         time.sleep(1)
 
-    save_dedup(dedup, config)
-
     # Per-source summary
     source_summary = {}
     for item in report_items:
         s = item["source"]
         if s not in source_summary:
-            source_summary[s] = {"total": 0, "sent": 0, "dedup": 0, "stale": 0, "source_cap": 0, "failed": 0}
+            source_summary[s] = {"total": 0, "sent": 0, "stale": 0, "source_cap": 0, "failed": 0}
         source_summary[s]["total"] += 1
         source_summary[s][item["status"]] = source_summary[s].get(item["status"], 0) + 1
 
     log("==========================================", config)
     log("RUN COMPLETED", config)
-    log("SENT: %d | SKIPPED_DEDUP: %d | SKIPPED_STALE: %d | SKIPPED_SOURCE_CAP: %d | FAILED: %d" % (
-        sent, skipped_dedup, skipped_stale, skipped_source_cap, failed), config)
+    log("SENT: %d | SKIPPED_STALE: %d | SKIPPED_SOURCE_CAP: %d | FAILED: %d" % (
+        sent, skipped_stale, skipped_source_cap, failed), config)
     for s, counts in source_summary.items():
         log("  %s: total=%d sent=%d dedup=%d stale=%d cap=%d failed=%d" % (
             s, counts["total"], counts["sent"], counts["dedup"], counts["stale"], counts["source_cap"], counts["failed"]), config)
