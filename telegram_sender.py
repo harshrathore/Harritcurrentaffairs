@@ -24,7 +24,8 @@ def send_text_to_telegram(headline, description, analysis, key_points, config):
     """
     Send a plain-text current affairs message to Telegram using HTML parse_mode.
 
-    analysis: dict with keys: exams (list), source (str), domain (str), link (str)
+    analysis: dict with keys: exams (list), source (str), domain (str), link (str),
+              date (str), category (str)
     Returns dict: {success, status_code, message}
     """
     max_retries = config.get("telegram_retries", 5)
@@ -33,11 +34,37 @@ def send_text_to_telegram(headline, description, analysis, key_points, config):
     exam_str = " | ".join(analysis.get("exams", [])) if analysis.get("exams") else "GENERAL"
     source_str = analysis.get("source") or "Unknown"
     domain_str = analysis.get("domain") or "GENERAL"
+    date_str = analysis.get("date") or ""
+    category_str = analysis.get("category") or ""
+
+    # Domain emojis
+    domain_emojis = {
+        "DEFENCE": "\U0001f3d6\ufe0f",
+        "ECONOMY": "\U0001f4b0",
+        "ENVIRONMENT": "\U0001f33f",
+        "SCIENCE": "\U0001f52c",
+        "POLITY": "\u2696\ufe0f",
+        "INTERNATIONAL": "\U0001f310",
+        "SOCIAL": "\U0001f46a",
+        "AGRICULTURE": "\U0001f33e",
+        "SPORTS": "\U0001f3c6",
+        "GENERAL": "\U0001f4cb",
+    }
+    emoji = domain_emojis.get(domain_str, "\U0001f4cb")
 
     # Build HTML message
     msg = "<b>CURRENT AFFAIRS</b>\n"
     msg += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    msg += "<b>" + escape_html(headline) + "</b>\n\n"
+
+    # Date line
+    if date_str:
+        msg += "\U0001f4c5 <b>Date:</b> " + escape_html(date_str) + "\n"
+
+    # Category/topic tag
+    if category_str:
+        msg += "\U0001f3f7\ufe0f <b>Category:</b> " + escape_html(category_str) + "\n"
+
+    msg += "\n" + "<b>" + escape_html(headline) + "</b>\n\n"
 
     if description:
         clean = description.replace("\n", " ").strip()
@@ -46,9 +73,9 @@ def send_text_to_telegram(headline, description, analysis, key_points, config):
         msg += escape_html(clean) + "\n\n"
 
     msg += "━━━━━━━━━━━━━━━━━━━━━━\n"
-    msg += "<b>Exam:</b> " + escape_html(exam_str) + "\n"
-    msg += "<b>Source:</b> " + escape_html(source_str) + "\n"
-    msg += "<b>Domain:</b> " + escape_html(domain_str) + "\n"
+    msg += emoji + " <b>Domain:</b> " + escape_html(domain_str) + "\n"
+    msg += "\U0001f4da <b>Exam:</b> " + escape_html(exam_str) + "\n"
+    msg += "\U0001f4dd <b>Source:</b> " + escape_html(source_str) + "\n"
     msg += "━━━━━━━━━━━━━━━━━━━━━━\n"
 
     if key_points:

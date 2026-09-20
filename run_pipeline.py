@@ -321,6 +321,8 @@ def main():
             "source": src,
             "domain": domain,
             "link": art.get("link", ""),
+            "date": art.get("date", ""),
+            "category": art.get("category", ""),
         }
         key_points = extract_key_points(art.get("description", ""), 3)
 
