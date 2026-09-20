@@ -122,7 +122,7 @@ def create_article_slide(prs, article):
                 font_size=14, color=LIGHT_GREEN)
 
     content = article.get("content", "").replace("\n", " ")
-    add_textbox(slide, 0.5, 1.7, 12.3, 5.3, content[:4000],
+    add_textbox(slide, 0.5, 1.7, 12.3, 5.3, content,
                 font_size=18, color=WHITE)
 
 

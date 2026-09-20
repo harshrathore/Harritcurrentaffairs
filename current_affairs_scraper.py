@@ -229,7 +229,7 @@ def scrape_gktoday():
                                 ):
                                     tag.decompose()
                                 full_content = content_div.get_text(separator=" ", strip=True)
-                                full_content = full_content[:2000]  # Limit to 2000 chars
+                                full_content = full_content[:50000]  # Full content for PowerPoint
                     except Exception as e:
                         error_log(f"GKTODAY: Failed to fetch article content: {e}")
 
@@ -359,7 +359,7 @@ def scrape_visionias():
                     for tag in content_div.select("script, style, .related-posts, .share-buttons, nav"):
                         tag.decompose()
                     content = content_div.get_text(separator=" ", strip=True)
-                    article["content"] = content[:2000]
+                    article["content"] = content[:50000]
                     log(f"VISIONIAS: Fetched content for: {article['title'][:50]}")
         except Exception as e:
             error_log(f"VISIONIAS: Failed to fetch article content: {e}")
@@ -430,7 +430,7 @@ def scrape_insightsonindia():
                                 "url": url,
                                 "date": date.strftime("%Y-%m-%d") + "T00:00:00",
                                 "category": "Current Affairs",
-                                "content": content[:3000],
+                                "content": content[:50000],
                                 "collected_at": datetime.now().isoformat()
                             })
                 if "post navigation" in txt.lower():
@@ -459,7 +459,7 @@ def scrape_insightsonindia():
                                     "url": url,
                                     "date": date.strftime("%Y-%m-%d") + "T00:00:00",
                                     "category": "Current Affairs",
-                                    "content": content[:3000],
+                                    "content": content[:50000],
                                     "collected_at": datetime.now().isoformat()
                                 })
                     cur_title = None
@@ -580,14 +580,14 @@ def scrape_drishtiias():
                         content = c.get_text(separator=" ", strip=True)
                         if len(content) > 100:
                             break
-                articles.append({
-                    "id": aid,
-                    "source": "Drishti IAS",
-                    "title": title,
-                    "url": link,
-                    "date": date.strftime("%Y-%m-%d") + "T00:00:00",
-                    "category": "Current Affairs",
-                    "content": content[:2000],
+                    articles.append({
+                        "id": aid,
+                        "source": "Drishti IAS",
+                        "title": title,
+                        "url": link,
+                        "date": date.strftime("%Y-%m-%d") + "T00:00:00",
+                        "category": "Current Affairs",
+                        "content": content[:50000],
                     "collected_at": datetime.now().isoformat()
                 })
             except Exception as e:
