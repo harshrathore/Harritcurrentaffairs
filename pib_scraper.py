@@ -31,7 +31,7 @@ FALLBACK_URL = (
     "allRel.aspx?reg=48&lang=1"
 )
 
-LOOKBACK_DAYS = 14
+LOOKBACK_DAYS = 400  # Scrape until June 1, 2026 (~400 days)
 
 REQUEST_DELAY = 1.0
 
@@ -1554,12 +1554,7 @@ def build_latest_output(
 
     today = datetime.now().date()
 
-    oldest_date = (
-        today -
-        timedelta(
-            days=LOOKBACK_DAYS
-        )
-    )
+    cutoff_date = datetime(2026, 6, 1).date()
 
     latest = []
 
@@ -1577,7 +1572,7 @@ def build_latest_output(
             continue
 
         if (
-            oldest_date
+            cutoff_date
             <= article_date
             <= today
         ):
@@ -1668,19 +1663,14 @@ def main():
 
     today = datetime.now().date()
 
-    oldest_date = (
-        today -
-        timedelta(
-            days=LOOKBACK_DAYS
-        )
-    )
+    cutoff_date = datetime(2026, 6, 1).date()
 
     log(
         f"TARGET DATE: {today}"
     )
 
     log(
-        f"OLDEST ALLOWED: {oldest_date}"
+        f"CUTOFF DATE: {cutoff_date}"
     )
 
     # =====================================================
@@ -1744,7 +1734,7 @@ def main():
             continue
 
         if (
-            oldest_date
+            cutoff_date
             <= article_date
             <= today
         ):
