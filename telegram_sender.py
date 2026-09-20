@@ -68,8 +68,8 @@ def send_text_to_telegram(headline, description, analysis, key_points, config):
 
     if description:
         clean = description.replace("\n", " ").strip()
-        if len(clean) > config.get("description_chars", 400):
-            clean = clean[: config.get("description_chars", 400)] + "..."
+        if len(clean) > config.get("description_chars", 2000):
+            clean = clean[: config.get("description_chars", 2000)] + "..."
         msg += escape_html(clean) + "\n\n"
 
     msg += "━━━━━━━━━━━━━━━━━━━━━━\n"

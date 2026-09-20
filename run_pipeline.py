@@ -336,7 +336,9 @@ def main():
 
         link = art.get("link", "")
         if link:
-            result = telegram_sender.send_link_to_telegram(link, config)
+            result = telegram_sender.send_text_to_telegram(
+                art.get("title", ""), art.get("description", ""), analysis, key_points, config
+            )
         else:
             result = {"success": False, "message": "No link"}
         if result["success"]:
