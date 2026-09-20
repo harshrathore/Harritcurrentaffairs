@@ -8,6 +8,7 @@ from pptx.enum.text import PP_ALIGN
 BASE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE, "..", "data", "PIB")
 CA_DB = os.path.join(DATA_DIR, "current_affairs_database.json")
+PIB_DB = os.path.join(DATA_DIR, "pib_database.json")
 PPTX_DIR = os.path.join(DATA_DIR, "slides")
 MASTER_FILE = os.path.join(PPTX_DIR, "current_affairs_all.pptx")
 
@@ -29,15 +30,41 @@ CATEGORY_COLORS = {
     "Places in News": RGBColor(0x1B, 0x5E, 0x20),
     "Reports & Indexes": RGBColor(0x4C, 0xAF, 0x50),
     "Summits & Conferences": RGBColor(0x43, 0xA0, 0x47),
+    "PIB": RGBColor(0x01, 0x57, 0x9B),
+    "Ministry of Defence": RGBColor(0x1B, 0x5E, 0x20),
+    "Ministry of Finance": RGBColor(0x38, 0x8E, 0x3C),
+    "Ministry of External Affairs": RGBColor(0x4C, 0xAF, 0x50),
+    "Ministry of Education": RGBColor(0x43, 0xA0, 0x47),
 }
 
 
 def load_ca_database():
+    articles = {}
+    # Load GKToday
     try:
         with open(CA_DB, encoding="utf-8") as f:
-            return json.load(f)
+            for k, v in json.load(f).items():
+                articles[k] = v
     except Exception:
-        return {}
+        pass
+    # Load PIB
+    try:
+        with open(PIB_DB, encoding="utf-8") as f:
+            pib = json.load(f)
+            for k, v in pib.items():
+                aid = "PIB_" + str(k)
+                articles[aid] = {
+                    "id": aid,
+                    "source": "PIB",
+                    "title": v.get("title", ""),
+                    "content": v.get("content", ""),
+                    "date": v.get("date", ""),
+                    "category": v.get("ministry", "PIB"),
+                    "url": v.get("article_url", ""),
+                }
+    except Exception:
+        pass
+    return articles
 
 
 def get_color(category):
