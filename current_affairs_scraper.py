@@ -782,119 +782,6 @@ def scrape_pmfias():
 
 
 # =========================================================
-# RAJASTHAN DIPR SCRAPER
-# =========================================================
-
-def scrape_rajasthan_dipr():
-    """Scrape Rajasthan DIPR press releases via government API."""
-    log("RAJDIPR: Starting scrape...")
-    articles = []
-    seen = set()
-
-    api_url = (
-        "https://departmentfrontwebapi.rajasthan.gov.in"
-        "/PublicPortal/DepartmentWebsite/"
-        "GetDIPRPressReleaseByFilter"
-    )
-
-    from_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%dT00:00:00")
-    to_date = datetime.now().strftime("%Y-%m-%dT23:59:59")
-
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/plain, */*",
-        "Origin": "https://rajasthan.gov.in",
-        "Referer": "https://rajasthan.gov.in/",
-        "User-Agent": HEADERS["User-Agent"],
-    }
-
-    payload = {
-        "FromDateTime": from_date,
-        "ToDateTime": to_date,
-        "PressReleaseLevelCode": 30204,
-        "CategoryCode": 36,
-        "DepartmentCode": 0,
-        "PageNumber": 1,
-        "PageSize": 100,
-    }
-
-    for page in range(1, 5):
-        payload["PageNumber"] = page
-        try:
-            resp = requests.post(api_url, json=payload, headers=headers, timeout=30)
-            if resp.status_code != 200:
-                log(f"RAJDIPR: API status {resp.status_code}")
-                break
-            data = resp.json()
-            # Handle nested response: {"Data": {"Data": [...]}} or {"Data": [...]}
-            inner = data.get("Data", data)
-            if isinstance(inner, dict):
-                records = inner.get("Data", inner.get("data", []))
-            elif isinstance(inner, list):
-                records = inner
-            else:
-                records = []
-            if not records:
-                break
-        except Exception as e:
-            error_log(f"RAJDIPR: API error: {e}")
-            break
-
-        for rec in records:
-            try:
-                rid = str(rec.get("Id", ""))
-                if not rid or rid in seen:
-                    continue
-                seen.add(rid)
-
-                title = rec.get("PressReleaseTitle", "") or ""
-                if not title:
-                    title = rec.get("CategoryName", "") or ""
-                title = re.sub(r"<[^>]+>", "", title).strip()
-                title = html.unescape(title).strip()
-                if not title:
-                    title = rec.get("CategoryName", "") or ""
-                    title = html.unescape(title).strip()
-                desc = rec.get("GeneralDescription", "") or rec.get("Description", "") or ""
-                desc = re.sub(r"<[^>]+>", "", desc)
-                desc = html.unescape(desc).strip()
-                date_str = rec.get("PressreleaseDate", "") or rec.get("PressReleaseDate", "")
-
-                if not title:
-                    title = desc[:80] if desc else ""
-
-                if not title or title == "Press Release":
-                    cat = rec.get("SubCategoryName", "") or rec.get("CategoryName", "") or ""
-                    if desc:
-                        first_line = desc.split("\n")[0][:60].strip()
-                        title = f"{cat}: {first_line}" if cat else first_line
-                    elif cat:
-                        title = cat
-
-                if not title:
-                    continue
-
-                article_id = f"DIPR_{rid}"
-                articles.append({
-                    "id": article_id,
-                    "source": "Rajasthan DIPR",
-                    "title": title,
-                    "url": f"https://rajasthan.gov.in/pressrelease/{rid}",
-                    "date": date_str[:10] if date_str else datetime.now().strftime("%Y-%m-%d"),
-                    "category": "Rajasthan",
-                    "content": desc[:2000],
-                    "collected_at": datetime.now().isoformat(),
-                })
-            except Exception as e:
-                error_log(f"RAJDIPR: parse error: {e}")
-
-        time.sleep(1)
-
-    log(f"RAJDIPR: Scraped {len(articles)} articles")
-    return articles
-
-
-# =========================================================
 # BUILD 7-DAY OUTPUT
 # =========================================================
 
@@ -946,7 +833,6 @@ def main():
         ("Drishti IAS", scrape_drishtiias),
         ("Down to Earth", scrape_downtoearth),
         ("PMF IAS", scrape_pmfias),
-        ("Rajasthan DIPR", scrape_rajasthan_dipr),
     ]
 
     for name, fn in scrapers:

@@ -1,7 +1,7 @@
 # =========================================================
 # RUN PIPELINE (LOCAL PYTHON)
 # Replaces Google Apps Script runPIBPosterSystem()
-# Merges PIB + GKToday + Vision IAS + Insights IAS + Drishti IAS
+# Merges PIB + GKToday + Insights IAS + Drishti IAS + PMF IAS
 # Dedups locally, filters by age, sends to Telegram
 # =========================================================
 
