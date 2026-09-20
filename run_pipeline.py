@@ -18,11 +18,12 @@ try:
         scrape_visionias,
         scrape_insightsonindia,
         scrape_drishtiias,
+        scrape_pmfias,
         load_database as load_ca_database,
     )
 except Exception as e:
     print("WARN: could not import current_affairs_scraper functions:", e)
-    scrape_gktoday = scrape_visionias = scrape_insightsonindia = scrape_drishtiias = None
+    scrape_gktoday = scrape_visionias = scrape_insightsonindia = scrape_drishtiias = scrape_pmfias = None
     load_ca_database = None
 
 import telegram_sender
@@ -251,7 +252,7 @@ def main():
     ca = []
     if config.get("re_scrape") and load_ca_database:
         log("Re-scraping current affairs sources...", config)
-        for fn in (scrape_gktoday, scrape_visionias, scrape_insightsonindia, scrape_drishtiias):
+        for fn in (scrape_gktoday, scrape_visionias, scrape_insightsonindia, scrape_drishtiias, scrape_pmfias):
             if fn is None:
                 continue
             try:
