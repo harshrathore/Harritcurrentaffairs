@@ -132,10 +132,11 @@ def save_database(database):
 # GKTODAY SCRAPER
 # =========================================================
 
-def scrape_gktoday():
+def scrape_gktoday(existing_db=None):
     """Scrape GKToday current affairs articles (paginated across listing pages + categories)."""
     log("GKTODAY: Starting scrape...")
     articles = []
+    skipped = 0
 
     # Main page + category pages for complete coverage
     base_urls = [
@@ -219,6 +220,14 @@ def scrape_gktoday():
                         stop_scraping = True
                         break
 
+                    # Generate article ID
+                    article_id = f"GKT_{link.split('/')[-2] if link.endswith('/') else link.split('/')[-1]}"
+
+                    # Skip if already in database
+                    if existing_db and article_id in existing_db:
+                        skipped += 1
+                        continue
+
                     # Fetch full article content from individual page
                     full_content = desc
                     try:
@@ -239,9 +248,6 @@ def scrape_gktoday():
                     except Exception as e:
                         error_log(f"GKTODAY: Failed to fetch article content: {e}")
 
-                    # Generate article ID
-                    article_id = f"GKT_{link.split('/')[-2] if link.endswith('/') else link.split('/')[-1]}"
-
                     articles.append({
                         "id": article_id,
                         "source": "GKToday",
@@ -259,7 +265,7 @@ def scrape_gktoday():
                 break
             time.sleep(REQUEST_DELAY)
 
-    log(f"GKTODAY: Scraped {len(articles)} articles")
+    log(f"GKTODAY: Scraped {len(articles)} new articles, skipped {skipped} existing")
     return articles
 
 
@@ -838,14 +844,14 @@ def main():
     alerts = []
 
     scrapers = [
-        ("GKToday", scrape_gktoday),
+        ("GKToday", lambda: scrape_gktoday(database)),
     ]
 
     for name, fn in scrapers:
         try:
             result = fn()
-            if not result and name not in ("Drishti IAS",):
-                alerts.append(f"{name}: 0 articles scraped")
+            if not result:
+                alerts.append(f"{name}: 0 new articles")
             new_articles.extend(result)
         except Exception as e:
             error_log(f"{name}: CRASHED - {e}")
