@@ -151,3 +151,42 @@ def test_connection(config):
         return {"ok": True, "bot": me["result"].get("username")}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+def send_document_to_telegram(filepath, caption, config):
+    """Send a file (document) to Telegram chat."""
+    max_retries = config.get("telegram_retries", 3)
+    token = config.get("telegram_bot_token", "")
+    chat_id = config.get("telegram_chat_id", "")
+    if not token or not chat_id:
+        return {"success": False, "message": "Missing token or chat_id"}
+
+    url = f"https://api.telegram.org/bot{token}/sendDocument"
+    for attempt in range(max_retries + 1):
+        try:
+            with open(filepath, "rb") as f:
+                resp = requests.post(
+                    url,
+                    data={"chat_id": chat_id, "caption": caption},
+                    files={"document": f},
+                    timeout=120,
+                )
+            body = resp.json()
+            if resp.status_code == 200 and body.get("ok"):
+                return {"success": True, "message": "File sent successfully"}
+            err = body.get("description", "Unknown error")
+            if "Too Many Requests" in err:
+                retry_after = int(body.get("parameters", {}).get("retry_after", 5))
+                time.sleep(retry_after + 1)
+                if attempt < max_retries:
+                    continue
+            if attempt < max_retries:
+                time.sleep(2)
+                continue
+            return {"success": False, "message": err}
+        except Exception as e:
+            if attempt < max_retries:
+                time.sleep(2)
+                continue
+            return {"success": False, "message": str(e)}
+    return {"success": False, "message": "Max retries exceeded"}

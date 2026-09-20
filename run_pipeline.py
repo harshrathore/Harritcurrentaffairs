@@ -391,6 +391,25 @@ def main():
     except Exception as e:
         log("REPORT SAVE ERROR: %s" % e, config)
 
+    # Generate slides and send to Telegram
+    try:
+        from generate_slides import add_date_to_master, MASTER_FILE
+        today = datetime.now().strftime("%Y-%m-%d")
+        pptx_path = add_date_to_master(today)
+        if pptx_path and os.path.exists(pptx_path):
+            log("Slides generated: %s" % pptx_path, config)
+            result = telegram_sender.send_document_to_telegram(
+                pptx_path,
+                "Daily Current Affairs - %s" % today,
+                config,
+            )
+            if result["success"]:
+                log("PPTX sent to Telegram", config)
+            else:
+                log("PPTX send failed: %s" % result["message"], config)
+    except Exception as e:
+        log("SLIDES ERROR: %s" % e, config)
+
 
 if __name__ == "__main__":
     try:
