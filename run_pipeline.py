@@ -334,9 +334,11 @@ def main():
             report_items.append({"id": aid, "source": src, "title": title, "status": "dry_run"})
             continue
 
-        result = telegram_sender.send_text_to_telegram(
-            art.get("title", ""), art.get("description", ""), analysis, key_points, config
-        )
+        link = art.get("link", "")
+        if link:
+            result = telegram_sender.send_link_to_telegram(link, config)
+        else:
+            result = {"success": False, "message": "No link"}
         if result["success"]:
             log("SENT | %s | %s | %s" % (src, domain, title), config)
             dedup[aid] = now.strftime("%Y-%m-%d %H:%M:%S")

@@ -140,6 +140,47 @@ def send_text_to_telegram(headline, description, analysis, key_points, config):
     return {"success": False, "status_code": 0, "message": "Max retries exceeded"}
 
 
+def send_link_to_telegram(link, config):
+    """Send a simple link message to Telegram."""
+    max_retries = config.get("telegram_retries", 3)
+    token = config.get("telegram_bot_token", "")
+    chat_id = config.get("telegram_chat_id", "")
+    if not token or not chat_id:
+        return {"success": False, "message": "Missing token or chat_id"}
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    for attempt in range(max_retries + 1):
+        try:
+            resp = requests.post(
+                url,
+                data={
+                    "chat_id": chat_id,
+                    "text": link,
+                    "disable_web_page_preview": False,
+                },
+                timeout=30,
+            )
+            body = resp.json()
+            if resp.status_code == 200 and body.get("ok"):
+                return {"success": True, "message": "Link sent"}
+            err = body.get("description", "Unknown error")
+            if "Too Many Requests" in err:
+                retry_after = int(body.get("parameters", {}).get("retry_after", 5))
+                time.sleep(retry_after + 1)
+                if attempt < max_retries:
+                    continue
+            if attempt < max_retries:
+                time.sleep(2)
+                continue
+            return {"success": False, "message": err}
+        except Exception as e:
+            if attempt < max_retries:
+                time.sleep(2)
+                continue
+            return {"success": False, "message": str(e)}
+    return {"success": False, "message": "Max retries exceeded"}
+
+
 def test_connection(config):
     """Verify bot token + chat id work."""
     try:
