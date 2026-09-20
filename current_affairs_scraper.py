@@ -153,9 +153,9 @@ def scrape_gktoday():
         "https://www.gktoday.in/current-affairs/category/art-culture-current-affairs",
         "https://www.gktoday.in/current-affairs/category/places-in-news-current-affairs",
     ]
-    max_pages = 10
+    cutoff_date = datetime(2026, 6, 1)
     for base in base_urls:
-        for pg in range(1, max_pages + 1):
+        for pg in range(1, 100):  # Max 100 pages per category
             url = base if pg == 1 else f"{base}/page/{pg}/"
             try:
                 resp = requests.get(url, headers=HEADERS, timeout=30)
@@ -169,6 +169,7 @@ def scrape_gktoday():
             if not items:
                 break
 
+            stop_scraping = False
             for item in items:
                 try:
                     # Extract title and link
@@ -213,6 +214,11 @@ def scrape_gktoday():
                     if not pub_date:
                         pub_date = datetime.now()
 
+                    # Stop if article is older than June 1, 2026
+                    if pub_date < cutoff_date:
+                        stop_scraping = True
+                        break
+
                     # Fetch full article content from individual page
                     full_content = desc
                     try:
@@ -249,6 +255,8 @@ def scrape_gktoday():
                 except Exception as e:
                     error_log(f"GKTODAY: Error parsing article: {e}")
                     continue
+            if stop_scraping:
+                break
             time.sleep(REQUEST_DELAY)
 
     log(f"GKTODAY: Scraped {len(articles)} articles")
