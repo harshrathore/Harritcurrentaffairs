@@ -17,8 +17,7 @@ import html
 
 # =========================================================
 # CURRENT AFFAIRS SCRAPER
-# GKToday + Insights IAS + Drishti IAS +
-# Down to Earth + Rajasthan DIPR
+# GKToday
 # =========================================================
 
 
@@ -829,10 +828,6 @@ def main():
 
     scrapers = [
         ("GKToday", scrape_gktoday),
-        ("Insights IAS", scrape_insightsonindia),
-        ("Drishti IAS", scrape_drishtiias),
-        ("Down to Earth", scrape_downtoearth),
-        ("PMF IAS", scrape_pmfias),
     ]
 
     for name, fn in scrapers:

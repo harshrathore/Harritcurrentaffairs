@@ -15,15 +15,11 @@ from datetime import datetime, timedelta
 try:
     from current_affairs_scraper import (
         scrape_gktoday,
-        scrape_visionias,
-        scrape_insightsonindia,
-        scrape_drishtiias,
-        scrape_pmfias,
         load_database as load_ca_database,
     )
 except Exception as e:
     print("WARN: could not import current_affairs_scraper functions:", e)
-    scrape_gktoday = scrape_visionias = scrape_insightsonindia = scrape_drishtiias = scrape_pmfias = None
+    scrape_gktoday = None
     load_ca_database = None
 
 import telegram_sender
@@ -252,7 +248,7 @@ def main():
     ca = []
     if config.get("re_scrape") and load_ca_database:
         log("Re-scraping current affairs sources...", config)
-        for fn in (scrape_gktoday, scrape_visionias, scrape_insightsonindia, scrape_drishtiias, scrape_pmfias):
+        for fn in (scrape_gktoday,):
             if fn is None:
                 continue
             try:
