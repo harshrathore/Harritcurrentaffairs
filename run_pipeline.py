@@ -362,7 +362,7 @@ def main():
     except Exception as e:
         log("REPORT SAVE ERROR: %s" % e, config)
 
-    # Generate slides and send to Telegram
+    # Generate slides, send to Telegram, upload to Google Drive
     try:
         from generate_slides import add_date_to_master, MASTER_FILE
         today = datetime.now().strftime("%Y-%m-%d")
@@ -378,6 +378,18 @@ def main():
                 log("PPTX sent to Telegram", config)
             else:
                 log("PPTX send failed: %s" % result["message"], config)
+
+            # Upload to Google Drive
+            try:
+                from google_drive_upload import upload_to_drive
+                folder_id = config.get("google_drive_folder_id", "")
+                drive_result = upload_to_drive(pptx_path, folder_id if folder_id else None)
+                if drive_result["success"]:
+                    log("PPTX uploaded to Google Drive: %s" % drive_result["link"], config)
+                else:
+                    log("Google Drive upload failed: %s" % drive_result["message"], config)
+            except Exception as e:
+                log("GOOGLE DRIVE ERROR: %s" % e, config)
     except Exception as e:
         log("SLIDES ERROR: %s" % e, config)
 

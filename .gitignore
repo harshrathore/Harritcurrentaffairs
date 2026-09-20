@@ -1,5 +1,7 @@
 # Secrets
 pipeline_config.json
+token.json
+credentials.json
 
 # Data files (too large for git, cached by GitHub Actions)
 data/
