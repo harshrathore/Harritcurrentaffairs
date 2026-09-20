@@ -149,6 +149,9 @@ def scrape_gktoday():
         "https://www.gktoday.in/current-affairs/category/international-current-affairs",
         "https://www.gktoday.in/current-affairs/category/awards-honours-persons-news-current-affairs",
         "https://www.gktoday.in/current-affairs/category/summits-conferences",
+        "https://www.gktoday.in/current-affairs/category/environment-biodiversity-current-affairs",
+        "https://www.gktoday.in/current-affairs/category/art-culture-current-affairs",
+        "https://www.gktoday.in/current-affairs/category/places-in-news-current-affairs",
     ]
     max_pages = 10
     for base in base_urls:
