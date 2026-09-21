@@ -362,16 +362,15 @@ def main():
     except Exception as e:
         log("REPORT SAVE ERROR: %s" % e, config)
 
-    # Generate slides, send to Telegram, upload to Google Drive
+    # Generate slides for ALL dates (June 1, 2026 onwards), send to Telegram, upload to Google Drive
     try:
-        from generate_slides import add_date_to_master, MASTER_FILE
-        today = datetime.now().strftime("%Y-%m-%d")
-        pptx_path = add_date_to_master(today)
+        from generate_slides import generate_full_presentation, add_date_to_master, MASTER_FILE
+        pptx_path = generate_full_presentation()
         if pptx_path and os.path.exists(pptx_path):
             log("Slides generated: %s" % pptx_path, config)
             result = telegram_sender.send_document_to_telegram(
                 pptx_path,
-                "Daily Current Affairs - %s" % today,
+                "Current Affairs Complete Presentation (June 2026 - Present)",
                 config,
             )
             if result["success"]:
