@@ -25,7 +25,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Create data directories
-        run: mkdir -p data/PIB
+        run: mkdir -p data/PIB/slides
 
       - name: Restore state
         uses: actions/cache@v4
@@ -52,17 +52,15 @@ jobs:
             'telegram_chat_id': os.environ['TG_CHAT'],
             'pib_database_path': os.path.join(os.getcwd(), 'data', 'PIB', 'pib_database.json'),
             'ca_database_path': os.path.join(os.getcwd(), 'data', 'PIB', 'current_affairs_database.json'),
-            'dedup_store_path': os.path.join(os.getcwd(), 'data', 'PIB', 'sent_articles.json'),
             'log_path': os.path.join(os.getcwd(), 'data', 'PIB', 'pipeline.log'),
-            're_scrape': False,
+            're_scrape': True,
             'dry_run': False,
             'max_article_age_hours': 2640,
-            'dedup_days': 14,
             'max_articles_per_source': 0,
             'max_articles_total': 0,
             'telegram_retries': 5,
             'send_delay': 2.0,
-            'description_chars': 400
+            'description_chars': 2000
           }
           with open('pipeline_config.json', 'w') as f: json.dump(config, f, indent=2)
           "

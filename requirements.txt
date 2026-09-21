@@ -4,3 +4,4 @@ cloudscraper
 yt-dlp
 youtube-transcript-api
 deep-translator
+python-pptx
