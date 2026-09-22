@@ -7,6 +7,11 @@
 import requests
 import time
 import json
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from dedup import is_sent, mark_sent, fingerprint
 
 
 def escape_html(text):
@@ -28,6 +33,11 @@ def send_text_to_telegram(headline, description, analysis, key_points, config):
               date (str), category (str)
     Returns dict: {success, status_code, message}
     """
+    # Dedup check
+    dedup_key = fingerprint(f"{headline}|{analysis.get('date', '')}|{analysis.get('source', '')}")
+    if is_sent(dedup_key):
+        return {"success": True, "status_code": 0, "message": "Skipped (already sent)"}
+
     max_retries = config.get("telegram_retries", 5)
     send_delay = config.get("send_delay", 2.0)
 
@@ -110,6 +120,7 @@ def send_text_to_telegram(headline, description, analysis, key_points, config):
                 body = {"ok": False, "description": resp.text}
 
             if status == 200 and body.get("ok"):
+                mark_sent(dedup_key, info=headline[:80])
                 if send_delay:
                     time.sleep(send_delay)
                 return {"success": True, "status_code": status, "message": "Sent successfully"}
@@ -142,6 +153,11 @@ def send_text_to_telegram(headline, description, analysis, key_points, config):
 
 def send_link_to_telegram(link, config):
     """Send a simple link message to Telegram."""
+    # Dedup check
+    dedup_key = fingerprint(link)
+    if is_sent(dedup_key):
+        return {"success": True, "message": "Skipped (already sent)"}
+
     max_retries = config.get("telegram_retries", 3)
     token = config.get("telegram_bot_token", "")
     chat_id = config.get("telegram_chat_id", "")
@@ -162,6 +178,7 @@ def send_link_to_telegram(link, config):
             )
             body = resp.json()
             if resp.status_code == 200 and body.get("ok"):
+                mark_sent(dedup_key, info=link[:80])
                 return {"success": True, "message": "Link sent"}
             err = body.get("description", "Unknown error")
             if "Too Many Requests" in err:
@@ -196,6 +213,12 @@ def test_connection(config):
 
 def send_document_to_telegram(filepath, caption, config):
     """Send a file (document) to Telegram chat."""
+    # Dedup check
+    file_size = os.path.getsize(filepath) if os.path.exists(filepath) else 0
+    dedup_key = fingerprint(f"{os.path.basename(filepath)}|{file_size}|{caption}")
+    if is_sent(dedup_key):
+        return {"success": True, "message": "Skipped (already sent)"}
+
     max_retries = config.get("telegram_retries", 3)
     token = config.get("telegram_bot_token", "")
     chat_id = config.get("telegram_chat_id", "")
@@ -214,6 +237,7 @@ def send_document_to_telegram(filepath, caption, config):
                 )
             body = resp.json()
             if resp.status_code == 200 and body.get("ok"):
+                mark_sent(dedup_key, info=caption[:80])
                 return {"success": True, "message": "File sent successfully"}
             err = body.get("description", "Unknown error")
             if "Too Many Requests" in err:
