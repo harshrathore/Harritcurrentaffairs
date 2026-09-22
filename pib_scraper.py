@@ -33,7 +33,12 @@ FALLBACK_URL = (
 
 LOOKBACK_DAYS = 400  # Scrape until June 1, 2026 (~400 days)
 
-REQUEST_DELAY = 1.0
+REQUEST_DELAY = 0.3
+
+# Date-range scraping mode
+SCRAPE_START = "2026-06-01"
+SCRAPE_END = "2026-09-01"
+SCRAPE_BY_DAY = True
 
 # ---------------------------------------------------------
 # IMPORTANT:
@@ -1647,6 +1652,76 @@ def build_latest_output(
 # MAIN SCRAPER
 # =========================================================
 
+def fetch_day_releases(year, month, day):
+    """Fetch all release links for a specific day using ASP.NET postback."""
+    try:
+        html = fetch_page(START_URL)
+        soup = BeautifulSoup(html, "html.parser")
+
+        viewstate_el = soup.find("input", {"name": "__VIEWSTATE"})
+        viewgen_el = soup.find("input", {"name": "__VIEWSTATEGENERATOR"})
+        eventval_el = soup.find("input", {"name": "__EVENTVALIDATION"})
+
+        if not viewstate_el or not eventval_el:
+            log("POSTBACK: Missing ViewState/EventValidation")
+            return []
+
+        data = {
+            "__EVENTTARGET": "",
+            "__EVENTARGUMENT": "",
+            "__LASTFOCUS": "",
+            "__VIEWSTATE": viewstate_el["value"],
+            "__VIEWSTATEGENERATOR": viewgen_el["value"] if viewgen_el else "",
+            "__VIEWSTATEENCRYPTED": "",
+            "__EVENTVALIDATION": eventval_el["value"],
+            "ctl00$Bar1$ddlregion": "3",
+            "ctl00$Bar1$ddlLang": "1",
+            "ctl00$ContentPlaceHolder1$ddlMinistry": "0",
+            "ctl00$ContentPlaceHolder1$ddlday": str(day),
+            "ctl00$ContentPlaceHolder1$ddlMonth": str(month),
+            "ctl00$ContentPlaceHolder1$ddlYear": str(year),
+        }
+
+        time.sleep(0.3)
+        response = session.post(START_URL, data=data, timeout=40)
+        response.raise_for_status()
+
+        return extract_release_links(response.text)
+
+    except Exception as e:
+        error_log(f"DAY FETCH ERROR: {year}-{month:02d}-{day:02d} | {e}")
+        return []
+
+
+def scrape_date_range(database):
+    """Scrape PIB day-by-day from SCRAPE_START to SCRAPE_END."""
+    start = datetime.strptime(SCRAPE_START, "%Y-%m-%d").date()
+    end = datetime.strptime(SCRAPE_END, "%Y-%m-%d").date()
+
+    all_releases = []
+    current = start
+
+    while current <= end:
+        day_releases = fetch_day_releases(
+            current.year, current.month, current.day
+        )
+
+        for release in day_releases:
+            release["date"] = current.isoformat()
+            all_releases.append(release)
+
+        log(
+            f"DAY {current.isoformat()}: "
+            f"{len(day_releases)} releases"
+        )
+
+        current += timedelta(days=1)
+        time.sleep(0.3)
+
+    log(f"DATE RANGE TOTAL: {len(all_releases)} releases")
+    return all_releases
+
+
 def main():
 
     log(
@@ -1687,27 +1762,33 @@ def main():
     # FETCH PIB ARCHIVE
     # =====================================================
 
-    try:
+    if SCRAPE_BY_DAY:
 
-        html = fetch_page(
-            START_URL
-        )
+        releases = scrape_date_range(database)
 
-        releases = extract_release_links(
-            html
-        )
+    else:
 
-    except Exception as e:
+        try:
 
-        error_log(
-            f"ARCHIVE ERROR: {e}"
-        )
+            html = fetch_page(
+                START_URL
+            )
 
-        build_latest_output(
-            database
-        )
+            releases = extract_release_links(
+                html
+            )
 
-        return
+        except Exception as e:
+
+            error_log(
+                f"ARCHIVE ERROR: {e}"
+            )
+
+            build_latest_output(
+                database
+            )
+
+            return
 
     log(
         f"ARCHIVE DISCOVERED: "
@@ -1715,7 +1796,7 @@ def main():
     )
 
     # =====================================================
-    # FILTER TO 7-DAY WINDOW
+    # FILTER TO DATE WINDOW
     # =====================================================
 
     candidates = []
@@ -1744,7 +1825,7 @@ def main():
             )
 
     log(
-        f"7-DAY CANDIDATES: "
+        f"CANDIDATES IN RANGE: "
         f"{len(candidates)}"
     )
 
