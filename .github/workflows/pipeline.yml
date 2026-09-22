@@ -35,6 +35,14 @@ jobs:
           restore-keys: |
             pipeline-state-
 
+      - name: Restore dedup state
+        uses: actions/cache@v4
+        with:
+          path: data/PIB/sent_messages.json
+          key: dedup-state-${{ github.run_number }}
+          restore-keys: |
+            dedup-state-
+
       - name: Restore utkarsh state
         uses: actions/cache@v4
         with:
@@ -81,4 +89,8 @@ jobs:
 
       - name: Run Utkarsh
         run: python utkarsh_youtube_ca.py
+        continue-on-error: true
+
+      - name: Send monthly slides
+        run: python send_monthly.py
         continue-on-error: true
