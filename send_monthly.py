@@ -1,4 +1,4 @@
-import json, os, requests
+import json, os, hashlib, requests
 from datetime import datetime
 from pptx import Presentation
 from pptx.util import Inches, Pt
@@ -10,6 +10,7 @@ CHAT_ID = "8250786682"
 
 DATA_DIR = r"C:\Users\ratho\Documents\Default Project\data\PIB"
 SLIDES_DIR = os.path.join(DATA_DIR, "slides")
+SENT_STATE_FILE = os.path.join(DATA_DIR, "sent_months.json")
 
 DARK_GREEN = RGBColor(0x58, 0x6E, 0x5A)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
@@ -130,6 +131,23 @@ def send_to_telegram(filepath, caption):
     return r.json().get("ok", False)
 
 
+def load_sent_state():
+    if os.path.exists(SENT_STATE_FILE):
+        with open(SENT_STATE_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def save_sent_state(state):
+    with open(SENT_STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2)
+
+
+def content_hash(articles):
+    titles = sorted(a.get("title", "") for a in articles)
+    return hashlib.md5(json.dumps(titles).encode()).hexdigest()
+
+
 # Load all data
 with open(os.path.join(DATA_DIR, "pib_database.json"), encoding="utf-8") as f:
     pib = json.load(f)
@@ -167,14 +185,20 @@ for art in all_articles:
 
 os.makedirs(SLIDES_DIR, exist_ok=True)
 
-# Generate and send each month
+sent_state = load_sent_state()
+
 for m in sorted(months.keys()):
     arts = months[m]
+    h = content_hash(arts)
+    if m in sent_state and sent_state[m] == h:
+        print(f"{m}: SKIPPED (already sent, same content)")
+        continue
     pptx_path = generate_month_pptx(m, arts)
     month_names = {"06": "June", "07": "July", "08": "August", "09": "September"}
     mn = month_names.get(m[5:7], m[5:7])
     caption = f"{mn} 2026 Current Affairs - {len(arts)} articles (PIB + GKToday)"
     ok = send_to_telegram(pptx_path, caption)
+    if ok:
+        sent_state[m] = h
+        save_sent_state(sent_state)
     print(f"{m}: {len(arts)} articles -> sent={ok}")
-    # Check for duplicates by checking existing dates
-    # to avoid sending same content twice
