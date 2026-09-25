@@ -62,7 +62,7 @@ jobs:
             'ca_database_path': os.path.join(os.getcwd(), 'data', 'PIB', 'current_affairs_database.json'),
             'log_path': os.path.join(os.getcwd(), 'data', 'PIB', 'pipeline.log'),
             're_scrape': True,
-            'dry_run': False,
+            'dry_run': True,
             'max_article_age_hours': 2640,
             'max_articles_per_source': 0,
             'max_articles_total': 0,

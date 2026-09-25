@@ -257,6 +257,7 @@ def main():
     sent = 0
     skipped_stale = 0
     skipped_source_cap = 0
+    skipped_dedup = 0
     failed = 0
     report_items = []
 
@@ -313,14 +314,18 @@ def main():
         else:
             result = {"success": False, "message": "No link"}
         if result["success"]:
-            log("SENT | %s | %s | %s" % (src, domain, title), config)
-            sent += 1
-            report_items.append({"id": aid, "source": src, "title": title, "status": "sent"})
+            if "Skipped" in result.get("message", ""):
+                skipped_dedup += 1
+                report_items.append({"id": aid, "source": src, "title": title, "status": "dedup"})
+            else:
+                log("SENT | %s | %s | %s" % (src, domain, title), config)
+                sent += 1
+                report_items.append({"id": aid, "source": src, "title": title, "status": "sent"})
         else:
             log("FAILED | %s | %s" % (title, result["message"]), config)
             failed += 1
             report_items.append({"id": aid, "source": src, "title": title, "status": "failed", "error": result["message"]})
-        time.sleep(1)
+        time.sleep(0.2)
 
     # Per-source summary
     source_summary = {}
@@ -363,16 +368,18 @@ def main():
         log("REPORT SAVE ERROR: %s" % e, config)
 
     # Generate slides for ALL dates (June 1, 2026 onwards), send to Telegram, upload to Google Drive
-    try:
-        from generate_slides import generate_full_presentation, add_date_to_master, MASTER_FILE
-        pptx_path = generate_full_presentation()
-        if pptx_path and os.path.exists(pptx_path):
-            log("Slides generated: %s" % pptx_path, config)
-            result = telegram_sender.send_document_to_telegram(
-                pptx_path,
-                "Current Affairs Complete Presentation (June 2026 - Present)",
-                config,
-            )
+    # Disabled: monthly PPTX handled by send_monthly.py with proper dedup
+    if False:
+        try:
+            from generate_slides import generate_full_presentation, add_date_to_master, MASTER_FILE
+            pptx_path = generate_full_presentation()
+            if pptx_path and os.path.exists(pptx_path):
+                log("Slides generated: %s" % pptx_path, config)
+                result = telegram_sender.send_document_to_telegram(
+                    pptx_path,
+                    "Current Affairs Complete Presentation (June 2026 - Present)",
+                    config,
+                )
             if result["success"]:
                 log("PPTX sent to Telegram", config)
             else:
@@ -389,8 +396,8 @@ def main():
                     log("Google Drive upload failed: %s" % drive_result["message"], config)
             except Exception as e:
                 log("GOOGLE DRIVE ERROR: %s" % e, config)
-    except Exception as e:
-        log("SLIDES ERROR: %s" % e, config)
+        except Exception as e:
+            log("SLIDES ERROR: %s" % e, config)
 
 
 if __name__ == "__main__":
