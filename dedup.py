@@ -9,27 +9,36 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "PIB"
-DEDUP_FILE = DATA_DIR / "sent_messages.json"
+# Try repo-local file first (committed to git, available in GitHub Actions),
+# fall back to data dir for local runs.
+_REPO_FILE = Path(__file__).resolve().parent / "sent_messages.json"
+_DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "PIB" / "sent_messages.json"
+DEDUP_FILE = _REPO_FILE if _REPO_FILE.exists() else _DATA_FILE
 
 
 def _load():
-    if DEDUP_FILE.exists():
-        try:
-            with open(DEDUP_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {"sent": {}, "last_updated": ""}
+    for path in (_REPO_FILE, _DATA_FILE):
+        if path.exists():
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                continue
     return {"sent": {}, "last_updated": ""}
 
 
 def _save(state):
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    # Save to BOTH locations so git commit + local state stay in sync
     state["last_updated"] = datetime.now().isoformat()
-    temp = DEDUP_FILE.with_suffix(".tmp")
-    with open(temp, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2, ensure_ascii=False)
-    temp.replace(DEDUP_FILE)
+    for path in (_REPO_FILE, _DATA_FILE):
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temp = path.with_suffix(".tmp")
+            with open(temp, "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=2, ensure_ascii=False)
+            temp.replace(path)
+        except Exception:
+            pass
 
 
 def fingerprint(text):
