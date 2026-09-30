@@ -1,8 +1,8 @@
 name: Harrit Pipeline
 
 on:
-  schedule:
-    - cron: '0 6 * * *'
+  # schedule disabled - re-enable by uncommenting
+  # - cron: '0 6 * * *'
   workflow_dispatch:
 
 permissions:

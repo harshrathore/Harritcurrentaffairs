@@ -1,8 +1,8 @@
 name: Utkarsh Daily CA
 
 on:
-  schedule:
-    - cron: '30 18 * * *'
+  # schedule disabled - re-enable by uncommenting
+  # - cron: '30 18 * * *'
   workflow_dispatch:
 
 permissions:
