@@ -12,7 +12,7 @@ from dedup import is_file_sent, mark_file_sent
 TOKEN = "7792990046:AAGfOItkWgJfTZRFHYNsNcwuqHuyjv3UkGk"
 CHAT_ID = "8250786682"
 
-DATA_DIR = r"C:\Users\ratho\Documents\Default Project\data\PIB"
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "PIB")
 SLIDES_DIR = os.path.join(DATA_DIR, "slides")
 
 DARK_GREEN = RGBColor(0x58, 0x6E, 0x5A)
@@ -107,6 +107,20 @@ def create_article_slide(prs, article):
     add_textbox(slide, 0.5, 1.7, 12.3, 5.3, content,
                 font_size=18, color=WHITE)
 
+    url = article.get("url", "")
+    if url:
+        txBox = slide.shapes.add_textbox(Inches(8.8), Inches(7.05), Inches(4.2), Inches(0.35))
+        tf = txBox.text_frame
+        tf.word_wrap = False
+        p = tf.paragraphs[0]
+        p.alignment = PP_ALIGN.RIGHT
+        run = p.add_run()
+        run.text = "Read more >"
+        run.font.size = Pt(11)
+        run.font.color.rgb = LIGHT_GREEN
+        run.font.name = "Calibri"
+        run.hyperlink.address = url
+
 
 def generate_month_pptx(month_str, articles):
     prs = Presentation()
@@ -162,6 +176,7 @@ for k, v in pib.items():
             "date": d,
             "category": v.get("ministry", "PIB"),
             "source": "PIB",
+            "url": v.get("article_url", "") or v.get("url", ""),
         })
 for k, v in ca.items():
     d = v.get("date", "")[:10]
@@ -172,6 +187,7 @@ for k, v in ca.items():
             "date": d,
             "category": v.get("category", ""),
             "source": "GKToday",
+            "url": v.get("url", ""),
         })
 
 # Group by month

@@ -152,6 +152,20 @@ def create_article_slide(prs, article):
     add_textbox(slide, 0.5, 1.7, 12.3, 5.3, content,
                 font_size=18, color=WHITE)
 
+    url = article.get("url", "")
+    if url:
+        txBox = slide.shapes.add_textbox(Inches(8.8), Inches(7.05), Inches(4.2), Inches(0.35))
+        tf = txBox.text_frame
+        tf.word_wrap = False
+        p = tf.paragraphs[0]
+        p.alignment = PP_ALIGN.RIGHT
+        run = p.add_run()
+        run.text = "Read more >"
+        run.font.size = Pt(11)
+        run.font.color.rgb = LIGHT_GREEN
+        run.font.name = "Calibri"
+        run.hyperlink.address = url
+
 
 def get_existing_dates_in_file(filepath):
     """Check which dates already exist in the master file."""
