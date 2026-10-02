@@ -36,8 +36,8 @@ LOOKBACK_DAYS = 400  # Scrape until June 1, 2026 (~400 days)
 REQUEST_DELAY = 0.3
 
 # Date-range scraping mode
-SCRAPE_START = "2026-06-01"
-SCRAPE_END = "2026-09-01"
+SCRAPE_START = "2026-09-01"
+SCRAPE_END = "2026-09-30"
 SCRAPE_BY_DAY = True
 
 # ---------------------------------------------------------

@@ -196,21 +196,30 @@ for art in all_articles:
     m = art["date"][:7]
     months.setdefault(m, []).append(art)
 
-os.makedirs(SLIDES_DIR, exist_ok=True)
 
-for m in sorted(months.keys()):
-    arts = months[m]
-    month_names = {"06": "June", "07": "July", "08": "August", "09": "September"}
-    mn = month_names.get(m[5:7], m[5:7])
-    filename = f"current_affairs_{m}.pptx"
-    caption = f"{mn} 2026 Current Affairs - {len(arts)} articles (PIB + GKToday)"
+def main(skip_months=()):
+    os.makedirs(SLIDES_DIR, exist_ok=True)
 
-    if is_file_sent(filename, len(arts)):
-        print(f"{m}: SKIPPED (already sent, same content)")
-        continue
+    for m in sorted(months.keys()):
+        if m in skip_months:
+            print(f"{m}: SKIPPED (excluded)")
+            continue
+        arts = months[m]
+        month_names = {"06": "June", "07": "July", "08": "August", "09": "September"}
+        mn = month_names.get(m[5:7], m[5:7])
+        filename = f"current_affairs_{m}.pptx"
+        caption = f"{mn} 2026 Current Affairs - {len(arts)} articles (PIB + GKToday)"
 
-    pptx_path = generate_month_pptx(m, arts)
-    ok = send_to_telegram(pptx_path, caption)
-    if ok:
-        mark_file_sent(filename, len(arts), info=caption)
-    print(f"{m}: {len(arts)} articles -> sent={ok}")
+        if is_file_sent(filename, len(arts)):
+            print(f"{m}: SKIPPED (already sent, same content)")
+            continue
+
+        pptx_path = generate_month_pptx(m, arts)
+        ok = send_to_telegram(pptx_path, caption)
+        if ok:
+            mark_file_sent(filename, len(arts), info=caption)
+        print(f"{m}: {len(arts)} articles -> sent={ok}")
+
+
+if __name__ == "__main__":
+    main()
