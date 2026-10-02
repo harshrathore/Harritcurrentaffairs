@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from pathlib import Path
 import json
+import os
 import time
 import re
 import html
@@ -28,7 +29,7 @@ import html
 LOOKBACK_DAYS = 7
 REQUEST_DELAY = 0.5
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "PIB"
+DATA_DIR = Path(os.environ.get("HARRIT_DATA_DIR") or (Path(__file__).resolve().parent.parent / "data" / "PIB"))
 
 DATABASE_FILE = DATA_DIR / "current_affairs_database.json"
 OUTPUT_FILE = DATA_DIR / "current_affairs_latest_7_days.json"

@@ -1,0 +1,77 @@
+name: October Current Affairs Delivery
+
+on:
+  schedule:
+    - cron: '0 6 1 11 *'  # Nov 1, 06:00 UTC (11:30 AM IST)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deliver-october:
+    runs-on: ubuntu-latest
+
+    env:
+      HARRIT_DATA_DIR: ${{ github.workspace }}/data/PIB
+      SCRAPE_START: '2026-10-01'
+      SCRAPE_END: '2026-10-31'
+      ONLY_MONTH: '2026-10'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create data directories
+        run: mkdir -p data/PIB/slides
+
+      - name: Restore state
+        uses: actions/cache@v4
+        with:
+          path: data/PIB
+          key: ca-state-${{ github.run_number }}
+          restore-keys: |
+            ca-state-
+            pipeline-state-
+
+      - name: Restore dedup state
+        uses: actions/cache@v4
+        with:
+          path: sent_messages.json
+          key: dedup-oct-${{ github.run_number }}
+          restore-keys: |
+            dedup-
+
+      - name: Scrape PIB (October 1-31)
+        run: python pib_scraper.py
+        continue-on-error: true
+
+      - name: Scrape GKToday
+        run: python current_affairs_scraper.py
+        continue-on-error: true
+
+      - name: Generate and send October PPTX
+        run: python send_monthly.py
+
+      - name: Upload PPTX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: october-current-affairs
+          path: data/PIB/slides/current_affairs_2026-10.pptx
+          if-no-files-found: error
+
+      - name: Commit dedup state
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add sent_messages.json
+          git diff --cached --quiet || git commit -m "chore: October delivery marked as sent [skip ci]"
+          git push || echo "push skipped"

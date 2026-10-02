@@ -12,7 +12,7 @@ from dedup import is_file_sent, mark_file_sent
 TOKEN = "7792990046:AAGfOItkWgJfTZRFHYNsNcwuqHuyjv3UkGk"
 CHAT_ID = "8250786682"
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "PIB")
+DATA_DIR = os.environ.get("HARRIT_DATA_DIR") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "PIB")
 SLIDES_DIR = os.path.join(DATA_DIR, "slides")
 
 DARK_GREEN = RGBColor(0x58, 0x6E, 0x5A)
@@ -126,7 +126,7 @@ def generate_month_pptx(month_str, articles):
     prs = Presentation()
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
-    month_names = {"06": "June", "07": "July", "08": "August", "09": "September"}
+    month_names = {"06": "June", "07": "July", "08": "August", "09": "September", "10": "October"}
     mn = month_names.get(month_str[5:7], month_str[5:7])
     year = month_str[:4]
     create_title_slide(prs, f"{mn} {year}", len(articles))
@@ -199,13 +199,16 @@ for art in all_articles:
 
 def main(skip_months=()):
     os.makedirs(SLIDES_DIR, exist_ok=True)
+    only_month = os.environ.get("ONLY_MONTH", "")
 
     for m in sorted(months.keys()):
         if m in skip_months:
             print(f"{m}: SKIPPED (excluded)")
             continue
+        if only_month and m != only_month:
+            continue
         arts = months[m]
-        month_names = {"06": "June", "07": "July", "08": "August", "09": "September"}
+        month_names = {"06": "June", "07": "July", "08": "August", "09": "September", "10": "October"}
         mn = month_names.get(m[5:7], m[5:7])
         filename = f"current_affairs_{m}.pptx"
         caption = f"{mn} 2026 Current Affairs - {len(arts)} articles (PIB + GKToday)"

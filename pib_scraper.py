@@ -4,6 +4,7 @@ from urllib.parse import urljoin, urlparse, parse_qs
 from datetime import datetime, timedelta
 from pathlib import Path
 import json
+import os
 import re
 import time
 
@@ -35,9 +36,9 @@ LOOKBACK_DAYS = 400  # Scrape until June 1, 2026 (~400 days)
 
 REQUEST_DELAY = 0.3
 
-# Date-range scraping mode
-SCRAPE_START = "2026-09-01"
-SCRAPE_END = "2026-09-30"
+# Date-range scraping mode (override via env for CI runs)
+SCRAPE_START = os.environ.get("SCRAPE_START", "2026-09-01")
+SCRAPE_END = os.environ.get("SCRAPE_END", "2026-09-30")
 SCRAPE_BY_DAY = True
 
 # ---------------------------------------------------------
@@ -60,10 +61,9 @@ TEST_LIMIT = None
 # FILES
 # =========================================================
 
-DATA_DIR = (
-    Path(__file__).resolve().parent.parent
-    / "data"
-    / "PIB"
+DATA_DIR = Path(
+    os.environ.get("HARRIT_DATA_DIR")
+    or (Path(__file__).resolve().parent.parent / "data" / "PIB")
 )
 DATABASE_FILE = (
     DATA_DIR /
