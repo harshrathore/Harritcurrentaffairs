@@ -34,7 +34,8 @@ TOPICS = [
     ("t6", "06_Geography_Environment.pptx", "Geography & Environment"),
     ("t7", "07_Science_Technology.pptx", "Science & Technology"),
     ("t8", "08_Indian_History_Culture.pptx", "Indian History & Culture"),
-    ("extra", "09_Extra_Content.pptx", "Extra Content (Out of Syllabus)"),
+    ("t9", "09_Sports_Current_Affairs.pptx", "Sports - Events & Achievements"),
+    ("extra", "10_Extra_Content.pptx", "Extra Content (Out of Syllabus)"),
 ]
 TOPIC_IDS = [t[0] for t in TOPICS]
 TOPIC_NAME = {t[0]: t[2] for t in TOPICS}
@@ -334,7 +335,12 @@ SPORTS = [
     "wins gold", "wins silver", "wins bronze", "gold medal", "silver medal",
     "bronze medal", "record in", "ranked first", "world no.", "no. 1 rank",
     "fide", "chess", "grandmaster", "wimbledon", "us open", "french open",
-    "australian open", "premier league", "la liga", "nba",
+    "australian open", "premier league", "la liga", "nba", "asia cup",
+    "team india", "khelo india", "para asian", "deaflympics", "neeraj",
+    "chopra", "sindhu", "kohli", "dhoni", "rohit", "bajrang", "sushil",
+    "viswanathan anand", "praggnanandhaa", "vidit", "dutee", "hima das",
+    "mirabai", "chanu", "abhinav bindra", "karnam malleswari",
+    "contingent", "athletes", "sportspersons", "coach",
 ]
 
 # GKToday category boost -> topic
@@ -464,7 +470,7 @@ def classify(a):
     # 1. rotation noise / sports -> extra (summit meetings are exam-relevant,
     #    so they bypass the "meets prime minister" noise rule)
     if PAT_SPORTS.search(title) or "sports" in cat:
-        return "extra"
+        return "t9"
     if PAT_NOISE.search(title) and not PAT_SUMMIT.search(title):
         return "extra"
 
@@ -543,6 +549,7 @@ TOPIC_BG = {
     "t3": RGBColor(0x00, 0x4D, 0x40), "t4": RGBColor(0x26, 0x32, 0x38),
     "t5": RGBColor(0x1B, 0x5E, 0x20), "t6": RGBColor(0x00, 0x69, 0x5C),
     "t7": RGBColor(0x0D, 0x47, 0xA1), "t8": RGBColor(0x4A, 0x14, 0x8C),
+    "t9": RGBColor(0xBF, 0x36, 0x0C),
     "extra": RGBColor(0x37, 0x47, 0x4F),
 }
 TOPIC_ACCENT = {
@@ -550,6 +557,7 @@ TOPIC_ACCENT = {
     "t3": RGBColor(0x26, 0xA6, 0x9A), "t4": RGBColor(0x78, 0x90, 0x9C),
     "t5": RGBColor(0x66, 0xBB, 0x6A), "t6": RGBColor(0x4D, 0xB6, 0xAC),
     "t7": RGBColor(0x42, 0xA5, 0xF5), "t8": RGBColor(0xAB, 0x47, 0xBC),
+    "t9": RGBColor(0xFF, 0x70, 0x43),
     "extra": RGBColor(0x90, 0xA4, 0xAE),
 }
 
