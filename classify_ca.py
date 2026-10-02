@@ -35,13 +35,14 @@ TOPICS = [
     ("t7", "07_Science_Technology.pptx", "Science & Technology"),
     ("t8", "08_Indian_History_Culture.pptx", "Indian History & Culture"),
     ("t9", "09_Sports_Current_Affairs.pptx", "Sports - Events & Achievements"),
-    ("extra", "10_Extra_Content.pptx", "Extra Content (Out of Syllabus)"),
+    ("taw", "10_Awards_Authors.pptx", "Awards, Honours & Authors"),
+    ("extra", "11_Extra_Content.pptx", "Extra Content (Out of Syllabus)"),
 ]
 TOPIC_IDS = [t[0] for t in TOPICS]
 TOPIC_NAME = {t[0]: t[2] for t in TOPICS}
 TOPIC_FILE = {t[0]: t[1] for t in TOPICS}
 
-PRIORITY = ["t7", "t5", "t4", "t6", "t8"]        # non-Rajasthan tie order
+PRIORITY = ["t7", "t5", "t4", "t6", "taw", "t8"]        # non-Rajasthan tie order
 RJ_PRIORITY = ["t2", "t3", "t1"]                  # Rajasthan tie order
 
 # ---------------------------------------------------------------- keywords
@@ -305,6 +306,26 @@ KW["t8"] = [
     "jayanti", "tribute", "homage to", "releases book", "autobiography", "memoir",
 ]
 
+KW["taw"] = [
+    # awards & honours
+    "award", "awards", "honoured", "honors", "honours", "prize", "laureate",
+    "padma shri", "padma bhushan", "padma vibhushan", "padma", "bharat ratna",
+    "national award", "national film award", "filmfare", "dadasaheb",
+    "jnanpith", "sahitya akademi", "booker", "pulitzer", "nobel", "fields medal",
+    "dronacharya", "shourya", "kirti chakra", "ashoka chakra", "param vir",
+    "gallantry", "president medal", "certificate of honour", "ramon magsaysay",
+    "grammy", "oscar", "critics", "elected fellow", "fellowship",
+    "conferred", "confers", "honorary", "title of", "recognised for",
+    "wins award", "won award", "best actor", "best actress", "best film",
+    # authors & books
+    "author", "authors", "authored", "writer", "writers", "book", "books",
+    "launches book", "releases book", "book release", "autobiography",
+    "biography", "memoir", "novel", "poet", "poetry", "literature",
+    "literary", "publisher", "publication", "wrote", "penned", "sahitya",
+    "kavi", "kavya", "booker prize", "world book", "publisher",
+]
+
+
 # ---------------------------------------------------------------- noise -> extra
 NOISE = [
     "condole", "condolence", "expresses grief", "grief over", "pays tribute",
@@ -330,7 +351,7 @@ SPORTS = [
     "hockey", "football", "badminton", "chess", "kabaddi", "ipl ", "wta ", "atp ",
     "fifa", "tournament", "world cup", "championship", "athletics", "tennis",
     "golf", "wrestl", "boxing", "boxer", "swimmer", "sportsperson", "sports person",
-    "arjuna award", "dronacharya award", "ranji", "football", "league", "match",
+    "ranji", "football", "league", "match",
     "goal", "penalty", "umpire", "referee", "batting", "bowling", "ties 1-1",
     "wins gold", "wins silver", "wins bronze", "gold medal", "silver medal",
     "bronze medal", "record in", "ranked first", "world no.", "no. 1 rank",
@@ -351,7 +372,7 @@ CAT_BOOST = {
     "defence": ("t7", 3),
     "government schemes": ("t5", 3),
     "environment": ("t6", 4),
-    "awards": ("t8", 3),
+    "awards": ("taw", 6),
     "legal": ("t4", 5),
     "constitution": ("t4", 5),
     "art & culture": ("t8", 4),
@@ -392,6 +413,8 @@ PATS_C = {k: compile_count(v) for k, v in KW.items()}    # count hits
 PAT_SCOPE = compile_kws(RJ_SCOPE)
 PAT_NOISE = compile_kws(NOISE)
 PAT_SPORTS = compile_kws(SPORTS)
+PAT_TAW = compile_kws(KW["taw"])
+PAT_AWARD_EXCL = re.compile(r"(?<!\w)(?:contract|tender|loa|work order|bid|sop|nha|nhai)(?!\w)")
 PAT_SUMMIT = compile_kws([
     "summit", "g7", "g20", "g-7", "g-20", "brics", "quad", "saarc", "sco",
     "shanghai cooperation", "asean", "un general assembly", "side-lines",
@@ -467,10 +490,17 @@ def classify(a):
     content = a["content"][:4000].lower()
     cat = (a.get("category") or "").lower()
 
-    # 1. rotation noise / sports -> extra (summit meetings are exam-relevant,
-    #    so they bypass the "meets prime minister" noise rule)
+    # 1. sports -> own topic (events & achievements)
     if PAT_SPORTS.search(title) or "sports" in cat:
         return "t9"
+
+    # 2. awards / honours / authors -> own topic (title evidence required;
+    #    contract/tender "awards" are economy, not honours)
+    if PAT_TAW.search(title) and not PAT_AWARD_EXCL.search(title):
+        return "taw"
+
+    # 3. rotation noise -> extra (summit meetings are exam-relevant,
+    #    so they bypass the "meets prime minister" noise rule)
     if PAT_NOISE.search(title) and not PAT_SUMMIT.search(title):
         return "extra"
 
@@ -482,7 +512,7 @@ def classify(a):
 
     # base scores
     scores = {}
-    for tid in ("t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8"):
+    for tid in ("t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "taw"):
         scores[tid] = score_topic(tid, title, content)
     for tid, val in boosts.items():
         if tid in scores:
@@ -550,6 +580,7 @@ TOPIC_BG = {
     "t5": RGBColor(0x1B, 0x5E, 0x20), "t6": RGBColor(0x00, 0x69, 0x5C),
     "t7": RGBColor(0x0D, 0x47, 0xA1), "t8": RGBColor(0x4A, 0x14, 0x8C),
     "t9": RGBColor(0xBF, 0x36, 0x0C),
+    "taw": RGBColor(0x88, 0x0E, 0x4F),
     "extra": RGBColor(0x37, 0x47, 0x4F),
 }
 TOPIC_ACCENT = {
@@ -558,6 +589,7 @@ TOPIC_ACCENT = {
     "t5": RGBColor(0x66, 0xBB, 0x6A), "t6": RGBColor(0x4D, 0xB6, 0xAC),
     "t7": RGBColor(0x42, 0xA5, 0xF5), "t8": RGBColor(0xAB, 0x47, 0xBC),
     "t9": RGBColor(0xFF, 0x70, 0x43),
+    "taw": RGBColor(0xF0, 0x62, 0x92),
     "extra": RGBColor(0x90, 0xA4, 0xAE),
 }
 
