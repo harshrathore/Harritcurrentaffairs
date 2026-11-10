@@ -1,10 +1,13 @@
 """Build the October 2026 current-affairs Excel workbook (7 headings + chart)."""
 import json
 import os
+import re
 from collections import Counter
 from datetime import date
 
 from openpyxl import Workbook
+from openpyxl.cell.rich_text import CellRichText, TextBlock
+from openpyxl.cell.text import InlineFont
 from openpyxl.chart import BarChart, Reference
 from openpyxl.chart.data_source import AxDataSource, StrRef
 from openpyxl.chart.label import DataLabelList
@@ -43,6 +46,82 @@ BOLD = Font(name="Calibri", size=10, bold=True)
 LINK_FONT = Font(name="Calibri", size=10, color="0563C1", underline="single")
 THIN = Side(style="thin", color="D9D9D9")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+
+MONTHS = ("January|February|March|April|May|June|July|August|September|"
+          "October|November|December")
+COUNTRIES = ("United States|United Kingdom|China|Russia|Ukraine|Japan|Australia|"
+             "Pakistan|Bangladesh|Sri Lanka|Nepal|Bhutan|Myanmar|Afghanistan|"
+             "Iran|Israel|Gaza|Palestine|Saudi Arabia|UAE|Qatar|Turkey|Germany|"
+             "France|Canada|Brazil|South Korea|North Korea|Vietnam|Philippines|"
+             "Indonesia|Malaysia|Singapore|Thailand|Nigeria|Kenya|Egypt|"
+             "South Africa|Mexico|Argentina|Italy|Spain|New Zealand|Switzerland|"
+             "Sweden|Norway|Denmark|Netherlands|Poland|Cuba|Maldives|Mauritius")
+STATES = ("Rajasthan|Jaipur|Jodhpur|Udaipur|Kota|Bikaner|Ajmer|Alwar|Bharatpur|"
+          "Chittorgarh|Jaisalmer|Barmer|Sikar|Bhilwara|Mount Abu|Assam|Bihar|"
+          "Gujarat|Haryana|Karnataka|Kerala|Madhya Pradesh|Maharashtra|Odisha|"
+          "Punjab|Tamil Nadu|Telangana|Uttar Pradesh|Uttarakhand|West Bengal|"
+          "Andhra Pradesh|Chhattisgarh|Goa|Himachal Pradesh|Jharkhand|Manipur|"
+          "Meghalaya|Mizoram|Nagaland|Sikkim|Tripura|Arunachal Pradesh")
+
+IMPORTANT_PATTERNS = [
+    re.compile(rf"\b(?:\d{{1,2}}\s+(?:{MONTHS})\s+\d{{4}}|"
+               rf"(?:{MONTHS})\s+\d{{1,2}},?\s+\d{{4}})\b"),
+    re.compile(r"\b(?:19|20)\d{2}\b"),
+    re.compile(r"(?:₹|Rs\.?|INR)\s?\d[\d,]*(?:\.\d+)?\s?"
+               r"(?:crore|lakh|billion|trillion|million)?"),
+    re.compile(r"\b\d[\d,]*(?:\.\d+)?\s?(?:crore|lakh|billion|trillion|million|"
+               r"per cent|percent|km|kg|tonnes?|MW|GW|kW|hectares?|acres?|"
+               r"bps|basis points)\b"),
+    re.compile(r"\b\d+(?:\.\d+)?\s?%"),
+    re.compile(r"\b\d+(?:st|nd|rd|th)\b"),
+    re.compile(r"\b[A-Z]{2,7}(?:-[A-Z0-9]{1,5})?\b"),
+    re.compile(r"\b(?:[A-Z][A-Za-z0-9&.\-]*\s+){1,5}"
+               r"(?:Yojana|Scheme|Mission|Abhiyan|Programme|Program)\b"),
+    re.compile(r"\b(?:Nobel Prize|Padma Shri|Padma Bhushan|Padma Vibhushan|"
+               r"Bharat Ratna|Arjuna Award|Khel Ratna|Dronacharya Award|"
+               r"Dhyan Chand Award|Jnanpith Award|Sahitya Akademi Award|"
+               r"Ramonujan Prize|World Food Prize|Booker Prize|Earthshot Prize|"
+               r"Oscar|Grammy|BAFTA)\b", re.I),
+    re.compile(r"\b(?:Chief of the Air Staff|Chief of Army Staff|"
+               r"Chief of Naval Staff|Chief of Defence Staff|Director General|"
+               r"Chairman|Chairperson|Governor|Chief Secretary|Managing Director|"
+               r"Vice-Chancellor|Secretary)\b"),
+    re.compile(rf"\b(?:{COUNTRIES}|{STATES})\b"),
+    re.compile(r"\b(?:India's|world's|country's|state's)\s+"
+               r"(?:first|largest|highest|lowest|only)\b|\bfirst-ever\b"),
+]
+
+
+def _merge(spans):
+    spans.sort()
+    out = []
+    for s, e in spans:
+        if out and s <= out[-1][1] + 1:
+            out[-1] = (out[-1][0], max(out[-1][1], e))
+        else:
+            out.append((s, e))
+    return out
+
+
+def rich_summary(text):
+    """Bold the 1-mark facts inside a summary string."""
+    spans = []
+    for pat in IMPORTANT_PATTERNS:
+        for m in pat.finditer(text):
+            if m.end() > m.start():
+                spans.append((m.start(), m.end()))
+    spans = _merge(spans)
+    if not spans:
+        return text
+    parts, pos = [], 0
+    for s, e in spans:
+        if s > pos:
+            parts.append(text[pos:s])
+        parts.append(TextBlock(InlineFont(rFont="Calibri", sz=10, b=True), text[s:e]))
+        pos = e
+    if pos < len(text):
+        parts.append(text[pos:])
+    return CellRichText(parts)
 
 
 def parse_date(s):
@@ -86,6 +165,12 @@ def build_summary(wb, rows):
                 f"Total articles: {len(rows):,} (duplicates removed)")
     ws["A3"].font = Font(name="Calibri", size=10, color="595959")
     ws["A3"].alignment = Alignment(horizontal="center")
+
+    ws.merge_cells("A4:F4")
+    ws["A4"] = ("Bold text inside Key Points = exam-critical 1-mark facts: "
+                "dates, numbers, ranks, schemes, awards, organisations and appointments")
+    ws["A4"].font = Font(name="Calibri", size=9, italic=True, color="7F6000")
+    ws["A4"].alignment = Alignment(horizontal="center")
 
     hdr = 5
     heads = ["Heading", "Articles", "Share", "What it covers", "Open sheet"]
@@ -211,6 +296,10 @@ def write_rows(ws, rows, start_row, with_heading):
             cell.alignment = Alignment(vertical="top", wrap_text=c in (4, 5, 7) if with_heading
                                        else c in (3, 4, 6))
 
+        # bold the 1-mark facts inside the summary
+        sum_col = 5 if with_heading else 4
+        ws.cell(row=r, column=sum_col).value = rich_summary(rec["summary"])
+
         # date
         dcol = 3 if with_heading else 2
         ws.cell(row=r, column=dcol).number_format = "dd-mmm-yyyy"
@@ -282,7 +371,7 @@ def build_category(wb, cat, rows):
     ws.row_dimensions[1].height = 38
 
     ws.merge_cells("A2:G2")
-    ws["A2"] = f"{len(rows):,} articles   |   {desc}"
+    ws["A2"] = f"{len(rows):,} articles   |   {desc}   |   Bold = 1-mark facts"
     ws["A2"].font = Font(name="Calibri", size=10, italic=True, color="404040")
     ws["A2"].alignment = Alignment(horizontal="center")
 
@@ -304,6 +393,14 @@ def build_category(wb, cat, rows):
 
 def main():
     rows = json.load(open(SRC, encoding="utf-8"))
+    for r in rows:
+        # drop a summary that merely repeats the title
+        t = r["title"].strip()
+        s = r["summary"].strip()
+        if s.lower().startswith(t.lower()):
+            s = s[len(t):].lstrip(" :–—-.")
+            if s:
+                r["summary"] = s
     rows.sort(key=lambda r: (CATS.index(r["category"]), r["date"], r["title"].lower()))
 
     wb = Workbook()
